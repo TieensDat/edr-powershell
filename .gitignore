@@ -1,0 +1,42 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+ipch/
+Debug/
+Release/
+x64/
+Win32/
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tlog
+*.lastbuildstate
+
+# Build outputs
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Python Agent logs
+PythonAgent/logs/*
+!PythonAgent/logs/.gitkeep
+
+# ML model files
+PythonAgent/model/*
+!PythonAgent/model/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="AgentConsole/AgentConsole.vcxproj" Id="d90175f9-ce53-4909-b33c-5f0b071f14cb" />
+  <Project Path="AmsiProvider/AmsiProvider.vcxproj" Id="43623662-0467-4590-8537-97fe8df0f615" />
+  <Project Path="PythonAgent/PythonAgent.pyproj" Type="888888a0-9f3d-457c-b088-3a5042f75d52" Id="79e9209a-a13d-49e4-a749-4f1d019c81f9">
+    <Platform Project="AnyCPU" />
+    <Build Project="false" />
+  </Project>
+</Solution>
