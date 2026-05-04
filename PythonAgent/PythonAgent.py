@@ -251,10 +251,29 @@ def is_trivial_noise(script: str) -> bool:
     if s in {"get-history", "clear-host", "cls"}:
         return True
 
+    if "127.0.0.1:9001/health" in s or "localhost:9001/health" in s:
+        return True
+
+    if "entervsdevshell" in s or "microsoft.visualstudio.devshell" in s or "vsappid" in s:
+        return True
+
+    if "pcasvc.dll" in s:
+        return True
+
+    if "appxdeploymentextensions.onecore.dll" in s:
+        return True
+
+    if "remove-item" in s and ("edr_events.jsonl" in s or "edr_features_g296.csv" in s or "edr_cpp_agent.log" in s):
+        return True
+
+    if s.startswith("cd") and len(s) <= 80:
+        return True
+
     if "psconsolehostreadline" in s or "psreadline" in s:
         suspicious = any(k in s for k in [
             "-encodedcommand", "-enc", "iex", "invoke-expression",
-            "downloadstring", "frombase64string", "mimikatz", "amsiutils"
+            "downloadstring", "frombase64string", "mimikatz", "amsiutils",
+            "set-mppreference", "disablerealtimemonitoring"
         ])
         if not suspicious:
             return True
@@ -881,6 +900,12 @@ def process_sensor():
 
     print("[SENSOR] Process Sensor started.")
     seen_pids = set()
+    try:
+        for proc in psutil.process_iter(["pid"]):
+            seen_pids.add(proc.info["pid"])
+        print(f"[PROCESS SENSOR] Baseline existing processes: {len(seen_pids)}")
+    except Exception as e:
+        print("[PROCESS SENSOR INIT ERROR]", e)
 
     while True:
         try:
@@ -986,6 +1011,36 @@ def file_sensor():
 # =====================================================
 # SENSOR 3: EVENT LOG 4104 SENSOR
 # =====================================================
+def get_latest_4104_record_id():
+    if win32evtlog is None:
+        return 0
+
+    try:
+        query = "*[System[(EventID=4104)]]"
+
+        handle = win32evtlog.EvtQuery(
+            POWERSHELL_EVENT_LOG,
+            win32evtlog.EvtQueryReverseDirection,
+            query
+        )
+
+        events = win32evtlog.EvtNext(handle, 1)
+
+        if not events:
+            return 0
+
+        xml = win32evtlog.EvtRender(events[0], win32evtlog.EvtRenderEventXml)
+
+        record_match = re.search(r"<EventRecordID>(\d+)</EventRecordID>", xml)
+        if not record_match:
+            return 0
+
+        return int(record_match.group(1))
+
+    except Exception as e:
+        print("[EVENTLOG SENSOR INIT ERROR]", e)
+        return 0
+
 def eventlog_4104_sensor():
     print("[SENSOR] Event Log 4104 Sensor started.")
 
@@ -993,7 +1048,8 @@ def eventlog_4104_sensor():
         print("[EVENTLOG SENSOR] pywin32 not installed. Sensor disabled.")
         return
 
-    last_record_id = 0
+    last_record_id = get_latest_4104_record_id()
+    print(f"[EVENTLOG SENSOR] Starting from RecordID: {last_record_id}")
 
     query = "*[System[(EventID=4104)]]"
 
