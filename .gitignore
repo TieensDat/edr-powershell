@@ -1,3 +1,14 @@
+# Secrets
+.env
+*.env
+ReportChatAgent/.env
+
+# ReportChatAgent generated reports/cache
+ReportChatAgent/reports/*
+!ReportChatAgent/reports/.gitkeep
+ReportChatAgent/__pycache__/
+ReportChatAgent/*.pyc
+
 # Visual Studio
 .vs/
 *.user
