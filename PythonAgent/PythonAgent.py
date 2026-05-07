@@ -237,6 +237,59 @@ def preprocess_normalized(text: str) -> str:
     return text
 
 
+def tokenize_ps(text: str) -> list[str]:
+    if not text:
+        return []
+    return re.findall(r"[A-Za-z_][A-Za-z0-9_-]{1,}|\$[A-Za-z_][A-Za-z0-9_]*", text.lower())
+
+
+def count_base64_strings(text: str, min_len: int = 40) -> int:
+    if not text:
+        return 0
+    pattern = rf"(?<![A-Za-z0-9+/=])(?:[A-Za-z0-9+/]{{{min_len},}}={{0,2}})(?![A-Za-z0-9+/=])"
+    return len(re.findall(pattern, text))
+
+
+def has_ascii_char_sequence(text: str) -> int:
+    if not text:
+        return 0
+    patterns = [
+        r'(?:\[char\]\s*"?\d{1,3}"?\s*(?:\+|,)?\s*){3,}',
+        r"(?:\[char\]\s*0x[0-9a-f]{1,2}\s*(?:\+|,)?\s*){3,}",
+    ]
+    return int(any(re.search(p, text, flags=re.IGNORECASE) for p in patterns))
+
+
+def compute_token_tfidf_features(tokens: list[str], vocab=None, idf=None, prefix: str = "token_tfidf_") -> dict:
+    vocab = vocab or {}
+    idf = idf or {}
+
+    if not tokens:
+        return {
+            f"{prefix}nonzero": 0,
+            f"{prefix}total": 0.0,
+            f"{prefix}max": 0.0,
+        }
+
+    counts = Counter(tokens)
+    total = sum(counts.values()) or 1
+    token_weights = {}
+
+    if vocab and idf:
+        for tok, cnt in counts.items():
+            if tok in vocab:
+                token_weights[tok] = (cnt / total) * float(idf.get(tok, 1.0))
+    else:
+        for tok, cnt in counts.items():
+            token_weights[tok] = cnt / total
+
+    return {
+        f"{prefix}nonzero": sum(1 for w in token_weights.values() if w > 0),
+        f"{prefix}total": float(sum(token_weights.values())),
+        f"{prefix}max": float(max(token_weights.values()) if token_weights else 0.0),
+    }
+
+
 def is_module_manifest(script: str) -> bool:
     s = normalize_compact(script)
     return (
@@ -325,6 +378,15 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
     f["caret_count"] = raw.count("^")
     f["concat_string_count"] = count_pattern(raw.lower(), r"\$\w+\s*\+\s*[\"']")
 
+    # === 1b. Token / structure features ===
+    tokens = tokenize_ps(raw)
+    token_counter = Counter(tokens)
+    total_tokens = len(tokens)
+    unique_tokens = len(token_counter)
+    f["unique_token_ratio"] = (unique_tokens / total_tokens) if total_tokens else 0
+    f["max_token_length"] = max((len(t) for t in tokens), default=0)
+    f["long_token_count"] = sum(1 for t in tokens if len(t) > 30)
+
     # === 2. Payload features ===
     strings = re.findall(r'"([^"]*)"', raw) + re.findall(r"'([^']*)'", raw)
     f["num_strings"] = len(strings)
@@ -341,6 +403,7 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
     f["has_pe_header_b64"] = has_pattern(raw, r"TVqQ")
     f["has_hex_byte_array"] = has_pattern(raw.lower(), r"(0x[0-9a-f]{1,2}\s*,){10,}")
     f["has_exe_download"] = has_pattern(raw.lower(), r"download(file|string)\s*\(.*['\"].*\.exe\s*['\"]")
+    f["base64_string_count"] = count_base64_strings(raw)
 
     f["payload_score"] = sum([f[k] > 0 for k in [
         "has_base64_payload", "has_hex_string", "has_hex_byte_array",
@@ -429,6 +492,7 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
     f["has_expand_env_vars"] = has_pattern(norm, r"environment\s+expandenvironmentvariables")
     f["complex_format_string"] = has_pattern(raw, r"\{\d+\}.*\{\d+\}.*\{\d+\}")
     f["string_reassembly"] = has_pattern(raw, r"\$\w+\s*=\s*\$\w+\s*\+\s*\$")
+    f["ascii_char_sequence"] = has_ascii_char_sequence(raw)
 
     f["obfuscation_score"] = sum([f[k] > 0 for k in [
         "replace_count", "join_count", "xor_count", "encoded_cmd", "hidden_window",
@@ -518,9 +582,6 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
         "has_new_item_file", "has_winforms", "has_batch_syntax", "has_browser_recon"
     ]])
 
-    # === G2.96 combined score ===
-    f["risk_score"] = f["obfuscation_score"] + f["payload_score"] + f["behavior_score"]
-
     has_download = (
         f["num_webclient"] > 0 or f["num_downloadfile"] > 0 or f["iwr_count"] > 0 or
         f["has_bitstransfer"] > 0 or f["has_certutil"] > 0 or f["has_webrequest"] > 0 or
@@ -529,8 +590,22 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
 
     has_execute = (
         f["iex_count"] > 0 or f["powershell_exe"] > 0 or f["start_process"] > 0 or
-        f["cmd_shell"] > 0 or f["reflected_assembly"] > 0
+        f["cmd_shell"] > 0 or f["reflected_assembly"] > 0 or
+        f["has_call_operator"] > 0 or f["has_dot_sourcing_exec"] > 0
     )
+
+    has_decode = (
+        f["num_frombase64"] > 0 or f["has_fromhexstring"] > 0 or
+        f["base64_string_count"] > 0 or f["has_base64_payload"] > 0 or
+        f["has_hex_string"] > 0 or f["has_hex_byte_array"] > 0
+    )
+
+    f["download_execute_chain"] = int(has_download and has_execute and f["has_whitelisted_download"] == 0)
+    f["decode_execute_chain"] = int(has_decode and has_execute)
+    f.update(compute_token_tfidf_features(tokens))
+
+    # === G2.96 combined score ===
+    f["risk_score"] = f["obfuscation_score"] + f["payload_score"] + f["behavior_score"]
 
     if has_download and has_execute and f["has_whitelisted_download"] == 0:
         f["risk_score"] += 5.0
@@ -546,12 +621,6 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
         f["risk_score"] += 3.0
 
     f["final_risk_score"] = f["risk_score"] / (f["benign_score"] + 1.0)
-
-    # Runtime-only metadata useful for logs, but not required for ML training.
-    f["runtime_source_is_amsi"] = int(event.get("source") == "amsi_cpp_bridge")
-    f["runtime_source_is_file"] = int(event.get("source") == "file_sensor")
-    f["runtime_source_is_process"] = int(event.get("source") == "process_sensor")
-    f["runtime_source_is_eventlog"] = int(event.get("source") == "eventlog_4104_sensor")
 
     return f
 
