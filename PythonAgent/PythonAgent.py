@@ -9,7 +9,9 @@ import math
 import queue
 import hashlib
 import threading
+import html
 from collections import Counter
+from xml.etree import ElementTree as ET
 
 # Optional dependencies
 try:
@@ -34,9 +36,11 @@ except ImportError:
 
 try:
     from watchdog.observers import Observer
+    from watchdog.observers.polling import PollingObserver
     from watchdog.events import FileSystemEventHandler
 except ImportError:
     Observer = None
+    PollingObserver = None
     FileSystemEventHandler = object
 
 try:
@@ -95,6 +99,7 @@ SCRIPT_EXTENSIONS = (
 SUSPICIOUS_PROCESS_NAMES = {
     "powershell.exe",
     "pwsh.exe",
+    "powershell_ise.exe",
     "wscript.exe",
     "cscript.exe",
     "mshta.exe",
@@ -106,6 +111,13 @@ SUSPICIOUS_PROCESS_NAMES = {
 
 POWERSHELL_EVENT_LOG = "Microsoft-Windows-PowerShell/Operational"
 POWERSHELL_EVENT_ID = 4104
+
+MAX_FILE_READ_BYTES = 1024 * 1024
+FILE_READ_RETRY_COUNT = 5
+FILE_READ_RETRY_DELAY_SECONDS = 0.2
+FILE_STABLE_READS_REQUIRED = 2
+FILE_EMPTY_MODIFIED_GRACE_SECONDS = 1.0
+SENSOR_POLL_INTERVAL_SECONDS = 0.5
 
 MAX_DEDUP_CACHE = 5000
 MAX_SCRIPT_LOG_CHARS = 900
@@ -899,75 +911,107 @@ def process_sensor():
         return
 
     print("[SENSOR] Process Sensor started.")
-    seen_pids = set()
     try:
-        for proc in psutil.process_iter(["pid"]):
-            seen_pids.add(proc.info["pid"])
+        seen_pids = set(psutil.pids())
         print(f"[PROCESS SENSOR] Baseline existing processes: {len(seen_pids)}")
     except Exception as e:
         print("[PROCESS SENSOR INIT ERROR]", e)
+        seen_pids = set()
 
     while True:
         try:
-            for proc in psutil.process_iter(["pid", "ppid", "name", "cmdline"]):
+            current_pids = set(psutil.pids())
+            new_pids = current_pids - seen_pids
+            seen_pids = current_pids
+
+            for pid in sorted(new_pids):
                 try:
-                    info = proc.info
-                    pid = info.get("pid")
-                    name = info.get("name") or ""
+                    proc = psutil.Process(pid)
+                    name = proc.name() or ""
                     lower_name = name.lower()
-                    if pid in seen_pids:
+
+                    cmdline_list = proc.cmdline()
+                    cmdline = " ".join(cmdline_list).strip()
+                    cmdline_lower = cmdline.lower()
+
+                    if lower_name not in SUSPICIOUS_PROCESS_NAMES and not re.search(r"\b(powershell|pwsh)\b", cmdline_lower):
                         continue
-                    if lower_name not in SUSPICIOUS_PROCESS_NAMES:
+
+                    if cmdline_lower.endswith("powershell.exe") or cmdline_lower.endswith("pwsh.exe") or cmdline_lower.endswith("powershell_ise.exe"):
                         continue
-                    seen_pids.add(pid)
-                    cmdline_list = info.get("cmdline") or []
-                    cmdline = " ".join(cmdline_list)
-                    cmdline_lower = cmdline.lower().strip()
-                    if cmdline_lower.endswith("powershell.exe") or cmdline_lower.endswith("pwsh.exe"):
+
+                    if not cmdline:
                         continue
-                    if not cmdline.strip():
-                        continue
+
+                    parent_process = ""
+                    executable_path = ""
+                    try:
+                        parent = proc.parent()
+                        parent_process = parent.name() if parent else ""
+                    except Exception:
+                        parent_process = ""
+                    try:
+                        executable_path = proc.exe()
+                    except Exception:
+                        executable_path = ""
+
                     event = {
                         "source": "process_sensor",
                         "pid": pid,
-                        "ppid": info.get("ppid"),
+                        "ppid": proc.ppid(),
                         "process": name,
-                        "parent_process": "",
+                        "parent_process": parent_process,
+                        "executable_path": executable_path,
                         "script": cmdline,
                         "local_verdict": "ALLOW",
                     }
                     submit_event(event)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
         except Exception as e:
             print("[PROCESS SENSOR ERROR]", e)
-        time.sleep(1)
+        time.sleep(SENSOR_POLL_INTERVAL_SECONDS)
 
 
 # =====================================================
 # SENSOR 2: FILE SENSOR
 # =====================================================
 class ScriptFileHandler(FileSystemEventHandler):
+    def __init__(self):
+        self.state_lock = threading.Lock()
+        self.last_emitted_content = {}
+        self.known_paths = set()
+
     def on_created(self, event):
-        self.handle_event(event)
+        self.handle_event(event, "created")
 
     def on_modified(self, event):
-        self.handle_event(event)
+        self.handle_event(event, "modified")
 
-    def handle_event(self, event):
+    def on_moved(self, event):
+        if getattr(event, "is_directory", False):
+            return
+        self.handle_path(getattr(event, "dest_path", ""), "moved")
+
+    def handle_event(self, event, event_type):
         if getattr(event, "is_directory", False):
             return
         path = getattr(event, "src_path", "")
+        self.handle_path(path, event_type)
+
+    def handle_path(self, path, event_type):
         if not path.lower().endswith(SCRIPT_EXTENSIONS):
             return
+
+        normalized_event_type = self.normalize_event_type(path, event_type)
+        content = self.read_content_for_event(path, normalized_event_type)
+        if content is None or not content.strip():
+            return
+
+        if not self.should_emit(path, content, normalized_event_type):
+            return
+
         try:
-            time.sleep(0.2)
-            if not os.path.exists(path):
-                return
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-            if not content.strip():
-                return
             event_data = {
                 "source": "file_sensor",
                 "pid": 0,
@@ -975,12 +1019,101 @@ class ScriptFileHandler(FileSystemEventHandler):
                 "process": "file_system",
                 "parent_process": "",
                 "path": path,
+                "file_event_type": normalized_event_type,
                 "script": content,
                 "local_verdict": "ALLOW",
             }
             submit_event(event_data)
+            with self.state_lock:
+                self.last_emitted_content[path] = content
+                self.known_paths.add(path)
         except Exception as e:
             print("[FILE SENSOR ERROR]", e)
+
+    def normalize_event_type(self, path, event_type):
+        if event_type == "moved":
+            return "moved"
+
+        with self.state_lock:
+            seen_before = path in self.known_paths
+
+        if seen_before:
+            return "modified"
+        return "created"
+
+    def should_emit(self, path, content, event_type):
+        with self.state_lock:
+            previous_content = self.last_emitted_content.get(path)
+
+        if event_type == "modified" and previous_content == content:
+            return False
+        return True
+
+    def read_content_for_event(self, path, event_type):
+        if event_type == "created":
+            return self.read_created_content(path)
+        return self.read_stable_content(path, event_type)
+
+    def read_created_content(self, path):
+        for _ in range(FILE_READ_RETRY_COUNT):
+            try:
+                if not os.path.exists(path):
+                    time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+                    continue
+                if os.path.getsize(path) > MAX_FILE_READ_BYTES:
+                    print("[FILE SENSOR] Skip large file:", path)
+                    return None
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                if not content:
+                    time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+                    continue
+                return content
+            except (FileNotFoundError, PermissionError):
+                time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+            except Exception as e:
+                print("[FILE SENSOR READ ERROR]", e)
+                return None
+        print("[FILE SENSOR] Cannot read created file after retries:", path)
+        return None
+
+    def read_stable_content(self, path, event_type):
+        last_content = None
+        stable_reads = 0
+
+        for _ in range(FILE_READ_RETRY_COUNT):
+            try:
+                if not os.path.exists(path):
+                    time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+                    continue
+                if os.path.getsize(path) > MAX_FILE_READ_BYTES:
+                    print("[FILE SENSOR] Skip large file:", path)
+                    return None
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+
+                if event_type == "modified" and not content:
+                    time.sleep(FILE_EMPTY_MODIFIED_GRACE_SECONDS)
+                    continue
+
+                if content == last_content:
+                    stable_reads += 1
+                else:
+                    last_content = content
+                    stable_reads = 1
+
+                if stable_reads >= FILE_STABLE_READS_REQUIRED:
+                    return content
+
+                time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+            except (FileNotFoundError, PermissionError):
+                time.sleep(FILE_READ_RETRY_DELAY_SECONDS)
+            except Exception as e:
+                print("[FILE SENSOR READ ERROR]", e)
+                return None
+
+        print("[FILE SENSOR] Cannot read stable file after retries:", path)
+        return None
 
 
 def file_sensor():
@@ -988,7 +1121,15 @@ def file_sensor():
         print("[FILE SENSOR] watchdog not installed. Sensor disabled.")
         return
     print("[SENSOR] File Sensor started.")
-    observer = Observer()
+    try:
+        observer = Observer()
+        print("[FILE SENSOR] Observer:", type(observer).__name__)
+    except Exception as e:
+        if PollingObserver is None:
+            print("[FILE SENSOR] Cannot create observer. Sensor disabled.", e)
+            return
+        observer = PollingObserver()
+        print("[FILE SENSOR] Fallback observer:", type(observer).__name__)
     handler = ScriptFileHandler()
     watched_any = False
     for path in WATCH_PATHS:
@@ -1011,6 +1152,71 @@ def file_sensor():
 # =====================================================
 # SENSOR 3: EVENT LOG 4104 SENSOR
 # =====================================================
+def safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def xml_text(node):
+    return node.text if node is not None and node.text is not None else ""
+
+
+def parse_4104_event_xml(xml):
+    result = {
+        "record_id": 0,
+        "event_id": 0,
+        "event_time": "",
+        "computer": "",
+        "script_block_text": "",
+        "path": "",
+        "message_number": "",
+        "message_total": "",
+    }
+
+    try:
+        root = ET.fromstring(xml)
+        ns = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
+
+        system = root.find("e:System", ns)
+        if system is not None:
+            result["event_id"] = safe_int(xml_text(system.find("e:EventID", ns)), 0)
+            result["record_id"] = safe_int(xml_text(system.find("e:EventRecordID", ns)), 0)
+            result["computer"] = xml_text(system.find("e:Computer", ns))
+
+            time_created = system.find("e:TimeCreated", ns)
+            if time_created is not None:
+                result["event_time"] = time_created.attrib.get("SystemTime", "")
+
+        event_data = root.find("e:EventData", ns)
+        if event_data is not None:
+            for item in event_data.findall("e:Data", ns):
+                name = item.attrib.get("Name", "")
+                value = html.unescape(xml_text(item))
+                if name == "ScriptBlockText":
+                    result["script_block_text"] = value
+                elif name == "Path":
+                    result["path"] = value
+                elif name == "MessageNumber":
+                    result["message_number"] = value
+                elif name == "MessageTotal":
+                    result["message_total"] = value
+
+        if not result["script_block_text"]:
+            fallback_blocks = re.findall(
+                r"<Data[^>]*>(.*?)</Data>",
+                xml,
+                flags=re.DOTALL
+            )
+            result["script_block_text"] = "\n".join(html.unescape(x) for x in fallback_blocks)
+
+    except Exception as e:
+        print("[EVENTLOG XML PARSE ERROR]", e)
+
+    return result
+
+
 def get_latest_4104_record_id():
     if win32evtlog is None:
         return 0
@@ -1030,12 +1236,7 @@ def get_latest_4104_record_id():
             return 0
 
         xml = win32evtlog.EvtRender(events[0], win32evtlog.EvtRenderEventXml)
-
-        record_match = re.search(r"<EventRecordID>(\d+)</EventRecordID>", xml)
-        if not record_match:
-            return 0
-
-        return int(record_match.group(1))
+        return parse_4104_event_xml(xml).get("record_id", 0)
 
     except Exception as e:
         print("[EVENTLOG SENSOR INIT ERROR]", e)
@@ -1066,48 +1267,25 @@ def eventlog_4104_sensor():
 
             for ev in events:
                 xml = win32evtlog.EvtRender(ev, win32evtlog.EvtRenderEventXml)
+                parsed = parse_4104_event_xml(xml)
 
-                record_match = re.search(r"<EventRecordID>(\d+)</EventRecordID>", xml)
-                if not record_match:
+                record_id = parsed.get("record_id", 0)
+                if not record_id:
                     continue
 
-                record_id = int(record_match.group(1))
                 if record_id <= last_record_id:
                     continue
 
-                script_blocks = re.findall(
-                    r"<Data Name=['\"]ScriptBlockText['\"]>(.*?)</Data>",
-                    xml,
-                    flags=re.DOTALL
-                )
-
-                if not script_blocks:
-                    # Fallback: sometimes payload is in generic Data fields
-                    script_blocks = re.findall(
-                        r"<Data[^>]*>(.*?)</Data>",
-                        xml,
-                        flags=re.DOTALL
-                    )
-
-                message = "\n".join(script_blocks)
-
-                # XML escape cleanup
-                message = (
-                    message.replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&amp;", "&")
-                    .replace("&quot;", '"')
-                    .replace("&apos;", "'")
-                )
+                message = parsed.get("script_block_text", "")
 
                 if not message.strip():
                     continue
 
-                batch.append((record_id, message))
+                batch.append((record_id, message, parsed))
 
             batch.sort(key=lambda x: x[0])
 
-            for record_id, message in batch:
+            for record_id, message, parsed in batch:
                 last_record_id = max(last_record_id, record_id)
 
                 event = {
@@ -1118,6 +1296,11 @@ def eventlog_4104_sensor():
                     "parent_process": "",
                     "event_id": 4104,
                     "record_id": record_id,
+                    "event_time": parsed.get("event_time", ""),
+                    "computer": parsed.get("computer", ""),
+                    "path": parsed.get("path", ""),
+                    "message_number": parsed.get("message_number", ""),
+                    "message_total": parsed.get("message_total", ""),
                     "script": message,
                     "local_verdict": "ALLOW",
                 }
@@ -1127,7 +1310,7 @@ def eventlog_4104_sensor():
         except Exception as e:
             print("[EVENTLOG SENSOR ERROR]", e)
 
-        time.sleep(2)
+        time.sleep(SENSOR_POLL_INTERVAL_SECONDS)
 
 
 # =====================================================
