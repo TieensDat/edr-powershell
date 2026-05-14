@@ -10,6 +10,7 @@ import queue
 import hashlib
 import threading
 import html
+import shutil
 from collections import Counter
 from xml.etree import ElementTree as ET
 
@@ -73,9 +74,11 @@ PORT = 9001
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 MODEL_DIR = os.path.join(BASE_DIR, "model")
+QUARANTINE_DIR = os.path.join(BASE_DIR, "quarantine")
 
 EVENT_LOG_PATH = os.path.join(LOG_DIR, "edr_events.jsonl")
 FEATURE_LOG_PATH = os.path.join(LOG_DIR, "edr_features_g296.csv")
+QUARANTINE_INDEX_PATH = os.path.join(LOG_DIR, "quarantine_index.jsonl")
 
 MODEL_PATH = os.path.join(MODEL_DIR, "random_forest_model.pkl")
 FEATURE_COLUMNS_PATH = os.path.join(MODEL_DIR, "feature_columns.pkl")
@@ -83,12 +86,38 @@ FEATURE_COLUMNS_PATH = os.path.join(MODEL_DIR, "feature_columns.pkl")
 ENABLE_PROCESS_SENSOR = True
 ENABLE_FILE_SENSOR = True
 ENABLE_EVENTLOG_4104_SENSOR = True
+ENABLE_RESPONSE = os.environ.get("EDR_ENABLE_RESPONSE", "0").strip().lower() in {"1", "true", "yes", "on"}
 
-WATCH_PATHS = [
-    os.path.expanduser("~/Desktop"),
-    os.path.expanduser("~/Downloads"),
-    os.path.expanduser("~/Documents"),
-]
+def build_watch_paths():
+    env_value = os.environ.get("EDR_WATCH_PATHS", "").strip()
+    if env_value:
+        candidates = [
+            os.path.expandvars(os.path.expanduser(path.strip()))
+            for path in env_value.split(";")
+            if path.strip()
+        ]
+    else:
+        user_home = os.path.expanduser("~")
+        candidates = [
+            os.path.join(user_home, "Desktop"),
+            os.path.join(user_home, "Downloads"),
+            os.path.join(user_home, "Documents"),
+            os.path.join(user_home, "OneDrive", "Documents"),
+            os.path.join(user_home, "OneDrive", "Desktop"),
+        ]
+
+    result = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normpath(path)
+        key = os.path.normcase(normalized)
+        if key not in seen:
+            result.append(normalized)
+            seen.add(key)
+    return result
+
+
+WATCH_PATHS = build_watch_paths()
 
 SCRIPT_EXTENSIONS = (
     ".ps1", ".psm1", ".psd1",
@@ -108,6 +137,30 @@ SUSPICIOUS_PROCESS_NAMES = {
     "reg.exe",
     "schtasks.exe",
 }
+
+PROTECTED_PROCESS_NAMES = {
+    "system",
+    "system idle process",
+    "registry",
+    "smss.exe",
+    "csrss.exe",
+    "wininit.exe",
+    "winlogon.exe",
+    "services.exe",
+    "lsass.exe",
+    "svchost.exe",
+    "explorer.exe",
+    "python.exe",
+    "pythonw.exe",
+}
+
+PROTECTED_COMMANDLINE_SUBSTRINGS = (
+    "pythonagent.py",
+    "start_python_agent.ps1",
+    "stop_python_agent.ps1",
+    "status_python_agent.ps1",
+    "run_response_tests.ps1",
+)
 
 POWERSHELL_EVENT_LOG = "Microsoft-Windows-PowerShell/Operational"
 POWERSHELL_EVENT_ID = 4104
@@ -134,6 +187,8 @@ event_queue = queue.Queue()
 seen_hashes = set()
 seen_lock = threading.Lock()
 log_lock = threading.Lock()
+response_lock = threading.Lock()
+quarantined_paths = set()
 
 ml_model = None
 feature_columns = None
@@ -146,6 +201,7 @@ ml_enabled = False
 def ensure_dirs():
     os.makedirs(LOG_DIR, exist_ok=True)
     os.makedirs(MODEL_DIR, exist_ok=True)
+    os.makedirs(QUARANTINE_DIR, exist_ok=True)
 
 
 def now_ts():
@@ -165,6 +221,10 @@ def truncate(text: str, limit: int = MAX_SCRIPT_LOG_CHARS) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + " ...[truncated]"
+
+
+def safe_console_text(text: str) -> str:
+    return (text or "").encode("ascii", errors="backslashreplace").decode("ascii")
 
 
 def safe_mean(values):
@@ -775,6 +835,9 @@ def load_ml_model():
         if not isinstance(feature_columns, list):
             feature_columns = list(feature_columns)
 
+        if hasattr(ml_model, "n_jobs"):
+            ml_model.n_jobs = 1
+
         ml_enabled = True
         print("[ML] Model loaded successfully.")
         print(f"[ML] Feature count: {len(feature_columns)}")
@@ -846,6 +909,193 @@ def combine_verdict(cpp_verdict: str, rule_verdict: str, ml_verdict: str, ml_con
 
 
 # =====================================================
+# RESPONSE ENGINE
+# Opt-in runtime enforcement. Only TERMINATE verdicts are acted on.
+# =====================================================
+def response_result(action: str, success: bool, reason: str, **extra) -> dict:
+    result = {
+        "response_enabled": ENABLE_RESPONSE,
+        "response_action": action,
+        "response_success": bool(success),
+        "response_reason": reason,
+    }
+    result.update(extra)
+    return result
+
+
+def is_path_under_watch(path: str) -> bool:
+    if not path:
+        return False
+
+    try:
+        target = os.path.normcase(os.path.abspath(path))
+        for watch_path in WATCH_PATHS:
+            watch_abs = os.path.normcase(os.path.abspath(watch_path))
+            if os.path.exists(watch_abs) and os.path.commonpath([target, watch_abs]) == watch_abs:
+                return True
+    except Exception:
+        return False
+
+    return False
+
+
+def safe_quarantine_name(path: str, event_hash: str) -> str:
+    base_name = os.path.basename(path) or "quarantined_script"
+    base_name = re.sub(r"[^A-Za-z0-9._-]+", "_", base_name)
+    stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+    hash_part = (event_hash or sha256_text(path))[:12]
+    return f"{stamp}_{hash_part}_{base_name}"
+
+
+def write_quarantine_index(record: dict):
+    with log_lock:
+        with open(QUARANTINE_INDEX_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def terminate_process_response(event: dict) -> dict:
+    if psutil is None:
+        return response_result("TERMINATE_PROCESS", False, "psutil_unavailable")
+
+    pid = safe_int(event.get("pid"), 0)
+    if pid <= 0:
+        return response_result("TERMINATE_PROCESS", False, "missing_pid")
+
+    if pid == os.getpid():
+        return response_result("TERMINATE_PROCESS", False, "refuse_to_terminate_self", target_pid=pid)
+
+    try:
+        proc = psutil.Process(pid)
+        process_name = (proc.name() or event.get("process") or "").lower()
+        try:
+            cmdline = " ".join(proc.cmdline()).lower()
+        except Exception:
+            cmdline = (event.get("script") or "").lower()
+
+        if process_name in PROTECTED_PROCESS_NAMES:
+            return response_result(
+                "TERMINATE_PROCESS",
+                False,
+                "protected_process",
+                target_pid=pid,
+                target_process=process_name,
+            )
+
+        if any(token in cmdline for token in PROTECTED_COMMANDLINE_SUBSTRINGS):
+            return response_result(
+                "TERMINATE_PROCESS",
+                False,
+                "protected_commandline",
+                target_pid=pid,
+                target_process=process_name,
+            )
+
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+            method = "terminate"
+        except psutil.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=3)
+            method = "kill"
+
+        return response_result(
+            "TERMINATE_PROCESS",
+            True,
+            "final_verdict_TERMINATE",
+            target_pid=pid,
+            target_process=process_name,
+            response_method=method,
+        )
+
+    except psutil.NoSuchProcess:
+        return response_result("TERMINATE_PROCESS", False, "process_not_running", target_pid=pid)
+    except psutil.AccessDenied:
+        return response_result("TERMINATE_PROCESS", False, "access_denied", target_pid=pid)
+    except Exception as e:
+        return response_result("TERMINATE_PROCESS", False, f"error:{type(e).__name__}:{e}", target_pid=pid)
+
+
+def quarantine_file_response(event: dict) -> dict:
+    path = event.get("path") or ""
+    if not path:
+        return response_result("QUARANTINE_FILE", False, "missing_path")
+
+    original_path = os.path.abspath(path)
+    original_key = os.path.normcase(original_path)
+    if not os.path.isfile(original_path):
+        with response_lock:
+            if original_key in quarantined_paths:
+                return response_result("QUARANTINE_FILE", True, "already_quarantined", original_path=original_path)
+        return response_result("QUARANTINE_FILE", False, "file_not_found", original_path=original_path)
+
+    if not is_path_under_watch(original_path):
+        return response_result("QUARANTINE_FILE", False, "path_outside_watch_scope", original_path=original_path)
+
+    try:
+        os.makedirs(QUARANTINE_DIR, exist_ok=True)
+        quarantine_name = safe_quarantine_name(original_path, event.get("sha256", ""))
+        quarantine_path = os.path.join(QUARANTINE_DIR, quarantine_name)
+
+        counter = 1
+        while os.path.exists(quarantine_path):
+            root, ext = os.path.splitext(quarantine_name)
+            quarantine_path = os.path.join(QUARANTINE_DIR, f"{root}_{counter}{ext}")
+            counter += 1
+
+        shutil.move(original_path, quarantine_path)
+        with response_lock:
+            quarantined_paths.add(original_key)
+
+        record = {
+            "time": now_ts(),
+            "sha256": event.get("sha256", ""),
+            "source": event.get("source", ""),
+            "final_verdict": event.get("final_verdict", ""),
+            "original_path": original_path,
+            "quarantine_path": quarantine_path,
+        }
+        write_quarantine_index(record)
+
+        return response_result(
+            "QUARANTINE_FILE",
+            True,
+            "final_verdict_TERMINATE",
+            original_path=original_path,
+            quarantine_path=quarantine_path,
+        )
+
+    except PermissionError:
+        return response_result("QUARANTINE_FILE", False, "permission_denied", original_path=original_path)
+    except Exception as e:
+        return response_result("QUARANTINE_FILE", False, f"error:{type(e).__name__}:{e}", original_path=original_path)
+
+
+def enforce_response(event: dict) -> dict:
+    if not ENABLE_RESPONSE:
+        return response_result("DISABLED", False, "response_disabled")
+
+    if (event.get("final_verdict") or "ALLOW").upper() != "TERMINATE":
+        return response_result("NONE", False, "verdict_not_terminate")
+
+    source = event.get("source") or "unknown"
+
+    if source == "process_sensor":
+        return terminate_process_response(event)
+
+    if source == "file_sensor":
+        return quarantine_file_response(event)
+
+    if source == "eventlog_4104_sensor":
+        return response_result("LOG_ONLY", True, "eventlog_4104_has_no_reliable_pid")
+
+    if source == "amsi_cpp_bridge":
+        return response_result("DELEGATED_TO_CPP_AGENT", True, "amsi_response_handled_by_cpp_bridge")
+
+    return response_result("NONE", False, "unsupported_source")
+
+
+# =====================================================
 # LOGGING
 # =====================================================
 def write_jsonl(event: dict):
@@ -872,6 +1122,10 @@ def append_features_csv(features: dict, event: dict):
     row["ml_confidence"] = event.get("ml_confidence")
     row["risk_level"] = event.get("data_analysis", {}).get("risk_level")
     row["final_verdict"] = event.get("final_verdict")
+    row["response_enabled"] = event.get("response_enabled")
+    row["response_action"] = event.get("response_action")
+    row["response_success"] = event.get("response_success")
+    row["response_reason"] = event.get("response_reason")
 
     df = pd.DataFrame([row])
 
@@ -964,7 +1218,10 @@ def worker():
             print("RAW RISK:", event.get("data_analysis", {}).get("raw_risk_score"), "BENIGN:", event.get("data_analysis", {}).get("benign_score"))
             print("REASONS:", ", ".join(event.get("data_analysis", {}).get("reasons", [])))
             print("FINAL:", event.get("final_verdict"))
-            print("SCRIPT:", truncate(event.get("script", "")))
+            print("SCRIPT:", safe_console_text(truncate(event.get("script", ""))))
+            response = enforce_response(event)
+            event.update(response)
+            print("RESPONSE:", event.get("response_action"), event.get("response_success"), event.get("response_reason"))
             write_jsonl(event)
             append_features_csv(event.get("features", {}), event)
         except Exception as e:
@@ -1425,6 +1682,10 @@ def health():
         "model_path": MODEL_PATH,
         "feature_columns_path": FEATURE_COLUMNS_PATH,
         "feature_version": "G2.96",
+        "response_enabled": ENABLE_RESPONSE,
+        "quarantine_path": QUARANTINE_DIR,
+        "quarantine_index_path": QUARANTINE_INDEX_PATH,
+        "agent_pid": os.getpid(),
         "process_sensor": ENABLE_PROCESS_SENSOR and psutil is not None,
         "file_sensor": ENABLE_FILE_SENSOR and Observer is not None,
         "eventlog_4104_sensor": ENABLE_EVENTLOG_4104_SENSOR and win32evtlog is not None,
@@ -1463,5 +1724,7 @@ if __name__ == "__main__":
     print(f"[+] Logs: {LOG_DIR}")
     print(f"[+] ML model path: {MODEL_PATH}")
     print(f"[+] Feature columns path: {FEATURE_COLUMNS_PATH}")
+    print(f"[+] Response enabled: {ENABLE_RESPONSE}")
+    print(f"[+] Quarantine: {QUARANTINE_DIR}")
 
     app.run(host=HOST, port=PORT)

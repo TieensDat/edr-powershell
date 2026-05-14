@@ -1,0 +1,22 @@
+[
+  {"id":"FS001","name":"Create .ps1 file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS002","name":"Create .psm1 file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS003","name":"Create .psd1 file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS004","name":"Create .js file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS005","name":"Create .vbs file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS006","name":"Create .bat file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS007","name":"Create .cmd file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS008","name":"Modify .ps1 file","expected_event":true,"expected_event_type":"modified"},
+  {"id":"FS009","name":"Modify .psm1 file","expected_event":true,"expected_event_type":"modified"},
+  {"id":"FS010","name":"Modify .psd1 file","expected_event":true,"expected_event_type":"modified"},
+  {"id":"FS011","name":"Modify .js file","expected_event":true,"expected_event_type":"modified"},
+  {"id":"FS012","name":"Move .tmp into .ps1","expected_event":true,"expected_event_type":"moved"},
+  {"id":"FS013","name":"Move .tmp into .psm1","expected_event":true,"expected_event_type":"moved"},
+  {"id":"FS014","name":"Move .tmp into .cmd","expected_event":true,"expected_event_type":"moved"},
+  {"id":"FS015","name":"Create locked .ps1 file","expected_event":true,"expected_event_type":"created"},
+  {"id":"FS016","name":"Ignore .txt file","expected_event":false,"expected_event_type":""},
+  {"id":"FS017","name":"Ignore .log file","expected_event":false,"expected_event_type":""},
+  {"id":"FS018","name":"Ignore .csv file","expected_event":false,"expected_event_type":""},
+  {"id":"FS019","name":"Ignore empty .ps1 file","expected_event":false,"expected_event_type":""},
+  {"id":"FS020","name":"Ignore large .ps1 file over limit","expected_event":false,"expected_event_type":""}
+]

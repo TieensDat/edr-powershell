@@ -1,0 +1,266 @@
+{
+  "run_id": "FSRUN_20260507_203232",
+  "started_at": "2026-05-07T20:32:32.3561201+07:00",
+  "finished_at": "2026-05-07T20:33:05.5288076+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "agent_health_ok": true,
+  "agent_health_error": null,
+  "event_log_path": "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+  "test_root": "C:\\KLTN\\mini-edr-powershell\\tests\\file_sensor\\runtime_watch\\FSRUN_20260507_203232",
+  "total": 20,
+  "passed": 20,
+  "failed": 0,
+  "success_rate_percent": 100.0,
+  "results": [
+    {
+      "id": "FS001",
+      "name": "Create .ps1 file",
+      "marker": "FSRUN_20260507_203232_FS001",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS002",
+      "name": "Create .psm1 file",
+      "marker": "FSRUN_20260507_203232_FS002",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS003",
+      "name": "Create .psd1 file",
+      "marker": "FSRUN_20260507_203232_FS003",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS004",
+      "name": "Create .js file",
+      "marker": "FSRUN_20260507_203232_FS004",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS005",
+      "name": "Create .vbs file",
+      "marker": "FSRUN_20260507_203232_FS005",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS006",
+      "name": "Create .bat file",
+      "marker": "FSRUN_20260507_203232_FS006",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS007",
+      "name": "Create .cmd file",
+      "marker": "FSRUN_20260507_203232_FS007",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS008",
+      "name": "Modify .ps1 file",
+      "marker": "FSRUN_20260507_203232_FS008",
+      "expected_event": true,
+      "expected_event_type": "modified",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "modified"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS009",
+      "name": "Modify .psm1 file",
+      "marker": "FSRUN_20260507_203232_FS009",
+      "expected_event": true,
+      "expected_event_type": "modified",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "modified"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS010",
+      "name": "Modify .psd1 file",
+      "marker": "FSRUN_20260507_203232_FS010",
+      "expected_event": true,
+      "expected_event_type": "modified",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "modified"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS011",
+      "name": "Modify .js file",
+      "marker": "FSRUN_20260507_203232_FS011",
+      "expected_event": true,
+      "expected_event_type": "modified",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "modified"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS012",
+      "name": "Move .tmp into .ps1",
+      "marker": "FSRUN_20260507_203232_FS012",
+      "expected_event": true,
+      "expected_event_type": "moved",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "moved"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS013",
+      "name": "Move .tmp into .psm1",
+      "marker": "FSRUN_20260507_203232_FS013",
+      "expected_event": true,
+      "expected_event_type": "moved",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "moved"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS014",
+      "name": "Move .tmp into .cmd",
+      "marker": "FSRUN_20260507_203232_FS014",
+      "expected_event": true,
+      "expected_event_type": "moved",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "moved"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS015",
+      "name": "Create locked .ps1 file",
+      "marker": "FSRUN_20260507_203232_FS015",
+      "expected_event": true,
+      "expected_event_type": "created",
+      "observed_new_events": 1,
+      "observed_event_types": [
+        "created"
+      ],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS016",
+      "name": "Ignore .txt file",
+      "marker": "FSRUN_20260507_203232_FS016",
+      "expected_event": false,
+      "expected_event_type": "",
+      "observed_new_events": 0,
+      "observed_event_types": [],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS017",
+      "name": "Ignore .log file",
+      "marker": "FSRUN_20260507_203232_FS017",
+      "expected_event": false,
+      "expected_event_type": "",
+      "observed_new_events": 0,
+      "observed_event_types": [],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS018",
+      "name": "Ignore .csv file",
+      "marker": "FSRUN_20260507_203232_FS018",
+      "expected_event": false,
+      "expected_event_type": "",
+      "observed_new_events": 0,
+      "observed_event_types": [],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS019",
+      "name": "Ignore empty .ps1 file",
+      "marker": "FSRUN_20260507_203232_FS019",
+      "expected_event": false,
+      "expected_event_type": "",
+      "observed_new_events": 0,
+      "observed_event_types": [],
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "FS020",
+      "name": "Ignore large .ps1 file over limit",
+      "marker": "FSRUN_20260507_203232_FS020",
+      "expected_event": false,
+      "expected_event_type": "",
+      "observed_new_events": 0,
+      "observed_event_types": [],
+      "passed": true,
+      "error": null
+    }
+  ]
+}

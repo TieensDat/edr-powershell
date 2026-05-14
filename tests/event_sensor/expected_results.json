@@ -1,0 +1,22 @@
+[
+  {"id":"EV001","name":"4104 simple Write-Host command","expected_event":true},
+  {"id":"EV002","name":"4104 Write-Output command","expected_event":true},
+  {"id":"EV003","name":"4104 NoProfile command","expected_event":true},
+  {"id":"EV004","name":"4104 ExecutionPolicy Bypass command","expected_event":true},
+  {"id":"EV005","name":"4104 EncodedCommand decoded script block","expected_event":true},
+  {"id":"EV006","name":"4104 command with IEX token","expected_event":true},
+  {"id":"EV007","name":"4104 command with Invoke-WebRequest token","expected_event":true},
+  {"id":"EV008","name":"4104 semicolon chained command","expected_event":true},
+  {"id":"EV009","name":"4104 variable assignment command","expected_event":true},
+  {"id":"EV010","name":"4104 function definition and invocation","expected_event":true},
+  {"id":"EV011","name":"4104 script file execution","expected_event":true},
+  {"id":"EV012","name":"4104 multiline script file execution","expected_event":true},
+  {"id":"EV013","name":"4104 pipeline command","expected_event":true},
+  {"id":"EV014","name":"4104 base64-like string literal","expected_event":true},
+  {"id":"EV015","name":"4104 command with Start-Process literal","expected_event":true},
+  {"id":"EV016","name":"4104 command with quoted marker","expected_event":true},
+  {"id":"EV017","name":"4104 command with here-string marker","expected_event":true},
+  {"id":"EV018","name":"4104 noninteractive command","expected_event":true},
+  {"id":"EV019","name":"cmd.exe should not create 4104 event","expected_event":false},
+  {"id":"EV020","name":"notepad.exe should not create 4104 event","expected_event":false}
+]

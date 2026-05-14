@@ -1,0 +1,277 @@
+﻿{
+    "run_id":  "EVRUN_20260508_145005",
+    "started_at":  "2026-05-08T14:50:05.5656832+07:00",
+    "finished_at":  "2026-05-08T14:50:56.1779644+07:00",
+    "agent_url":  "http://127.0.0.1:9001",
+    "agent_health_ok":  true,
+    "agent_health_error":  null,
+    "event_log_path":  "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+    "test_root":  "C:\\KLTN\\mini-edr-powershell\\tests\\event_sensor\\runtime_event\\EVRUN_20260508_145005",
+    "total":  20,
+    "passed":  20,
+    "failed":  0,
+    "success_rate_percent":  100,
+    "results":  [
+                    {
+                        "id":  "EV001",
+                        "name":  "4104 simple Write-Host command",
+                        "marker":  "EVRUN_20260508_145005_EV001",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10736
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV002",
+                        "name":  "4104 Write-Output command",
+                        "marker":  "EVRUN_20260508_145005_EV002",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10746
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV003",
+                        "name":  "4104 NoProfile command",
+                        "marker":  "EVRUN_20260508_145005_EV003",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10752
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV004",
+                        "name":  "4104 ExecutionPolicy Bypass command",
+                        "marker":  "EVRUN_20260508_145005_EV004",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10758
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV005",
+                        "name":  "4104 EncodedCommand decoded script block",
+                        "marker":  "EVRUN_20260508_145005_EV005",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10765
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV006",
+                        "name":  "4104 command with IEX token",
+                        "marker":  "EVRUN_20260508_145005_EV006",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10771
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV007",
+                        "name":  "4104 command with Invoke-WebRequest token",
+                        "marker":  "EVRUN_20260508_145005_EV007",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10781
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV008",
+                        "name":  "4104 semicolon chained command",
+                        "marker":  "EVRUN_20260508_145005_EV008",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10792
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV009",
+                        "name":  "4104 variable assignment command",
+                        "marker":  "EVRUN_20260508_145005_EV009",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10798
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV010",
+                        "name":  "4104 function definition and invocation",
+                        "marker":  "EVRUN_20260508_145005_EV010",
+                        "expected_event":  true,
+                        "observed_new_events":  2,
+                        "observed_record_ids":  [
+                                                    10804,
+                                                    10805
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV011",
+                        "name":  "4104 script file execution",
+                        "marker":  "EVRUN_20260508_145005_EV011",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10810
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV012",
+                        "name":  "4104 multiline script file execution",
+                        "marker":  "EVRUN_20260508_145005_EV012",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10816
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV013",
+                        "name":  "4104 pipeline command",
+                        "marker":  "EVRUN_20260508_145005_EV013",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10822
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV014",
+                        "name":  "4104 base64-like string literal",
+                        "marker":  "EVRUN_20260508_145005_EV014",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10829
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV015",
+                        "name":  "4104 command with Start-Process literal",
+                        "marker":  "EVRUN_20260508_145005_EV015",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10835
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV016",
+                        "name":  "4104 command with quoted marker",
+                        "marker":  "EVRUN_20260508_145005_EV016",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10841
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV017",
+                        "name":  "4104 command with here-string marker",
+                        "marker":  "EVRUN_20260508_145005_EV017",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10847
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV018",
+                        "name":  "4104 noninteractive command",
+                        "marker":  "EVRUN_20260508_145005_EV018",
+                        "expected_event":  true,
+                        "observed_new_events":  1,
+                        "observed_record_ids":  [
+                                                    10853
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV019",
+                        "name":  "cmd.exe should not create 4104 event",
+                        "marker":  "EVRUN_20260508_145005_EV019",
+                        "expected_event":  false,
+                        "observed_new_events":  0,
+                        "observed_record_ids":  [
+
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    },
+                    {
+                        "id":  "EV020",
+                        "name":  "notepad.exe should not create 4104 event",
+                        "marker":  "EVRUN_20260508_145005_EV020",
+                        "expected_event":  false,
+                        "observed_new_events":  0,
+                        "observed_record_ids":  [
+
+                                                ],
+                        "metadata_complete":  true,
+                        "passed":  true,
+                        "error":  null
+                    }
+                ]
+}

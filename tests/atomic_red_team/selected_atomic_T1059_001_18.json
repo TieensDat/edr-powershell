@@ -1,0 +1,5 @@
+﻿{
+    "technique":  "T1059.001",
+    "test_number":  "18",
+    "name":  "PowerShell Invoke Known Malicious Cmdlets"
+}

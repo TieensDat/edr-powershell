@@ -1,0 +1,288 @@
+{
+  "run_id": "PSRUN_20260507_210632",
+  "started_at": "2026-05-07T21:06:32.3884021+07:00",
+  "finished_at": "2026-05-07T21:07:03.7742378+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "agent_health_ok": true,
+  "agent_health_error": null,
+  "event_log_path": "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+  "test_root": "C:\\KLTN\\mini-edr-powershell\\tests\\process_sensor\\runtime_process\\PSRUN_20260507_210632",
+  "total": 20,
+  "passed": 20,
+  "failed": 0,
+  "success_rate_percent": 100.0,
+  "results": [
+    {
+      "id": "PS001",
+      "name": "PowerShell simple command",
+      "marker": "PSRUN_20260507_210632_PS001",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS002",
+      "name": "PowerShell NoProfile command",
+      "marker": "PSRUN_20260507_210632_PS002",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS003",
+      "name": "PowerShell ExecutionPolicy Bypass",
+      "marker": "PSRUN_20260507_210632_PS003",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS004",
+      "name": "PowerShell EncodedCommand",
+      "marker": "PSRUN_20260507_210632_PS004",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS005",
+      "name": "PowerShell WindowStyle Hidden",
+      "marker": "PSRUN_20260507_210632_PS005",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS006",
+      "name": "PowerShell long command line",
+      "marker": "PSRUN_20260507_210632_PS006",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS007",
+      "name": "PowerShell quoted command",
+      "marker": "PSRUN_20260507_210632_PS007",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS008",
+      "name": "PowerShell command with IEX",
+      "marker": "PSRUN_20260507_210632_PS008",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS009",
+      "name": "PowerShell command with Invoke-WebRequest",
+      "marker": "PSRUN_20260507_210632_PS009",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS010",
+      "name": "PowerShell command with Start-Process token",
+      "marker": "PSRUN_20260507_210632_PS010",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS011",
+      "name": "PowerShell -File script",
+      "marker": "PSRUN_20260507_210632_PS011",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS012",
+      "name": "PowerShell -Command from script variable",
+      "marker": "PSRUN_20260507_210632_PS012",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS013",
+      "name": "PowerShell mixed case suspicious args",
+      "marker": "PSRUN_20260507_210632_PS013",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS014",
+      "name": "PowerShell noninteractive command",
+      "marker": "PSRUN_20260507_210632_PS014",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS015",
+      "name": "PowerShell command with semicolon chain",
+      "marker": "PSRUN_20260507_210632_PS015",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS016",
+      "name": "PowerShell command with base64-like token",
+      "marker": "PSRUN_20260507_210632_PS016",
+      "expected_event": true,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 1,
+      "observed_processes": [
+        "powershell.exe"
+      ],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS017",
+      "name": "cmd.exe should be ignored",
+      "marker": "PSRUN_20260507_210632_PS017",
+      "expected_event": false,
+      "expected_process": "cmd.exe",
+      "observed_new_events": 0,
+      "observed_processes": [],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS018",
+      "name": "notepad.exe should be ignored",
+      "marker": "PSRUN_20260507_210632_PS018",
+      "expected_event": false,
+      "expected_process": "notepad.exe",
+      "observed_new_events": 0,
+      "observed_processes": [],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS019",
+      "name": "timeout.exe should be ignored",
+      "marker": "PSRUN_20260507_210632_PS019",
+      "expected_event": false,
+      "expected_process": "timeout.exe",
+      "observed_new_events": 0,
+      "observed_processes": [],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "PS020",
+      "name": "plain PowerShell executable without useful command line should be ignored",
+      "marker": "PSRUN_20260507_210632_PS020",
+      "expected_event": false,
+      "expected_process": "powershell.exe",
+      "observed_new_events": 0,
+      "observed_processes": [],
+      "metadata_complete": true,
+      "passed": true,
+      "error": null
+    }
+  ]
+}

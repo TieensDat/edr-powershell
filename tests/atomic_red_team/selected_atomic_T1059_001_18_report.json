@@ -1,0 +1,48 @@
+{
+  "run_id": "SELECTED_ATOMIC_20260508_141212",
+  "started_at": "2026-05-08T14:12:04.3639264+07:00",
+  "finished_at": "2026-05-08T14:12:12.6787935+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "agent_health_ok": true,
+  "agent_ml_enabled": true,
+  "atomics_path": "C:\\AtomicRedTeam\\atomics",
+  "selected_tests_path": "C:\\KLTN\\mini-edr-powershell\\tests\\atomic_red_team\\selected_atomic_T1059_001_18.json",
+  "event_log_path": "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+  "total_selected": 1,
+  "executed": 1,
+  "skipped_prereq": 0,
+  "errors": 0,
+  "executed_with_telemetry": 1,
+  "telemetry_success_rate_percent": 100.0,
+  "results": [
+    {
+      "id": "T1059.001-18",
+      "technique": "T1059.001",
+      "test_number": "18",
+      "name": "PowerShell Invoke Known Malicious Cmdlets",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "TERMINATE",
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS",
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE",
+        "ALLOW"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "\nCheckPrereq's for: \nT1059.001-18 PowerShell Invoke Known Malicious Cmdlets\n\nPrerequisites met: \nT1059.001-18 PowerShell Invoke Known Malicious Cmdlets\n\n\u001b[33;1mRunning Command and Scripting Interpreter: PowerShell Techni… [\u001b[7mProgress:                                             \u001b[27m]\u001b[0m",
+      "execution_output_tail": "Out-Minidump\r\nPowerUp\r\nPowerView\r\nRemove-Comments\r\nRemove-VolumeShadowCopy\r\nSet-CriticalProcess\r\nSet-MasterBootRecord\nExit code: 0\nDone executing test: \nT1059.001-18 PowerShell Invoke Known Malicious Cmdlets\n\n\u001b[33;1mRunning Command and Scripting Interpreter: PowerShell Techni… [\u001b[7mProgress:                                             \u001b[27m]\u001b[0m"
+    }
+  ]
+}

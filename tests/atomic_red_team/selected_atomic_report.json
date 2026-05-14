@@ -1,0 +1,351 @@
+{
+  "run_id": "SELECTED_ATOMIC_20260508_140611",
+  "started_at": "2026-05-08T14:04:45.8504179+07:00",
+  "finished_at": "2026-05-08T14:06:11.6244500+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "agent_health_ok": true,
+  "agent_ml_enabled": true,
+  "atomics_path": "C:\\AtomicRedTeam\\atomics",
+  "selected_tests_path": "C:\\KLTN\\mini-edr-powershell\\tests\\atomic_red_team\\selected_atomic_tests.json",
+  "event_log_path": "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+  "total_selected": 12,
+  "executed": 11,
+  "skipped_prereq": 1,
+  "errors": 0,
+  "executed_with_telemetry": 11,
+  "telemetry_success_rate_percent": 100.0,
+  "results": [
+    {
+      "id": "T1059.001-13",
+      "technique": "T1059.001",
+      "test_number": "13",
+      "name": "ATHPowerShellCommandLineParameter -Command parameter variations",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 37,
+      "observed_sources": [
+        "eventlog_4104_sensor",
+        "process_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW",
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "BENIGN",
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALLOW",
+        "ALERT",
+        "TERMINATE"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1059.001-13 ATHPowerShellCommandLineParameter -Command parameter variations\n\nPrerequisites met: \nT1059.001-13 ATHPowerShellCommandLineParameter -Command parameter variations\n",
+      "execution_output_tail": "New-Guid : The term 'New-Guid' is not recognized as the name of a cmdlet, function, script file, or operable program. \r\nAt C:\\Users\\sieng\\Documents\\PowerShell\\Modules\\AtomicTestHarnesses\\Windows\\TestHarnesses\\T1059.001_PowerShell\\OutPowerS\r\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\r\n+         $TestGuid = (New-Guid),\r\n+                      ~~~~~~~~\r\n    + CategoryInfo          : ObjectNotFound: (New-Guid:String) [], CommandNotFoundException\r\n    + FullyQualifiedErrorId : CommandNotFoundException\r\nhellCommandLineParameter.ps1:219 char:22\nExit code: 0\nDone executing test: \nT1059.001-13 ATHPowerShellCommandLineParameter -Command parameter variations\n"
+    },
+    {
+      "id": "T1059.001-15",
+      "technique": "T1059.001",
+      "test_number": "15",
+      "name": "ATHPowerShellCommandLineParameter -EncodedCommand parameter variations",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 25,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW",
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "BENIGN",
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALLOW",
+        "ALERT",
+        "TERMINATE"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1059.001-15 ATHPowerShellCommandLineParameter -EncodedCommand parameter variations\n\nPrerequisites met: \nT1059.001-15 ATHPowerShellCommandLineParameter -EncodedCommand parameter variations\n",
+      "execution_output_tail": "New-Guid : The term 'New-Guid' is not recognized as the name of a cmdlet, function, script file, or operable program. \r\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\r\nAt C:\\Users\\sieng\\Documents\\PowerShell\\Modules\\AtomicTestHarnesses\\Windows\\TestHarnesses\\T1059.001_PowerShell\\OutPowerS\r\nhellCommandLineParameter.ps1:219 char:22\r\n+                      ~~~~~~~~\r\n+         $TestGuid = (New-Guid),\r\n    + CategoryInfo          : ObjectNotFound: (New-Guid:String) [], CommandNotFoundException\r\n    + FullyQualifiedErrorId : CommandNotFoundException\nExit code: 0\nDone executing test: \nT1059.001-15 ATHPowerShellCommandLineParameter -EncodedCommand parameter variations\n"
+    },
+    {
+      "id": "T1059.001-17",
+      "technique": "T1059.001",
+      "test_number": "17",
+      "name": "PowerShell Command Execution",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 2,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS",
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1059.001-17 PowerShell Command Execution\n\nPrerequisites met: \nT1059.001-17 PowerShell Command Execution\n",
+      "execution_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nExecuting test: \nT1059.001-17 PowerShell Command Execution\n\nHello, from PowerShell!\n#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"><Obj S=\"progress\" RefId=\"0\"><TN RefId=\"0\"><T>System.Management.Automation.PSCustomObject</T><T>System.Object</T></TN><MS><I64 N=\"SourceId\">1</I64><PR N=\"Record\"><AV>Preparing modules for first use.</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj><Obj S=\"information\" RefId=\"1\"><TN RefId=\"1\"><T>System.Management.Automation.InformationRecord</T><T>System.Object</T></TN><ToString>Hello, from PowerShell!</ToString><Props><Obj N=\"MessageData\" RefId=\"2\"><TN RefId=\"2\"><T>System.Management.Automation.HostInformationMessage</T><T>System.Object</T></TN><ToString>Hello, from PowerShell!</ToString><Props><S N=\"Message\">Hello, from PowerShell!</S><B N=\"NoNewLine\">false</B><S N=\"ForegroundColor\">Gray</S><S N=\"BackgroundColor\">Black</S></Props></Obj><S N=\"Source\">Write-Host</S><DT N=\"TimeGenerated\">2026-05-08T14:05:03.3805108+07:00</DT><Obj N=\"Tags\" RefId=\"3\"><TN RefId=\"3\"><T>System.Collections.Generic.List`1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]</T><T>System.Object</T></TN><LST><S>PSHOST</S></LST></Obj><S N=\"User\">DESKTOP-O1BIM0D\\CodexSandboxOffline</S><S N=\"Computer\">DESKTOP-O1BIM0D</S><U32 N=\"ProcessId\">4232</U32><U32 N=\"NativeThreadId\">10972</U32><U32 N=\"ManagedThreadId\">14</U32></Props></Obj></Objs>\nExit code: 0\nDone executing test: \nT1059.001-17 PowerShell Command Execution\n"
+    },
+    {
+      "id": "T1059.001-18",
+      "technique": "T1059.001",
+      "test_number": "18",
+      "name": "PowerShell Invoke Known Malicious Cmdlets",
+      "status": "SKIPPED_PREREQ",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 0,
+      "observed_sources": [],
+      "observed_rule_verdicts": [],
+      "observed_ml_verdicts": [],
+      "observed_final_verdicts": [],
+      "observed_max_verdict": "ALLOW",
+      "ml_enabled_seen": false,
+      "prereq_output_tail": "\nPrerequisites not met: T1059.001-18 PowerShell Invoke Known Malicious Cmdlets\n\t[*] Elevation required but not provided\n\n\nTry installing prereq's with the \n-GetPrereqs\n switch",
+      "execution_output_tail": ""
+    },
+    {
+      "id": "T1027-2",
+      "technique": "T1027",
+      "test_number": "2",
+      "name": "Execute base64-encoded PowerShell",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 4,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS",
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1027-2 Execute base64-encoded PowerShell\n\nPrerequisites met: \nT1027-2 Execute base64-encoded PowerShell\n",
+      "execution_output_tail": "\nExecuting test: \nT1027-2 Execute base64-encoded PowerShell\n\nVwByAGkAdABlAC0ASABvAHMAdAAgACIASABlAHkALAAgAEEAdABvAG0AaQBjACEAIgA=\r\nHey, Atomic!\n#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"><Obj S=\"progress\" RefId=\"0\"><TN RefId=\"0\"><T>System.Management.Automation.PSCustomObject</T><T>System.Object</T></TN><MS><I64 N=\"SourceId\">1</I64><PR N=\"Record\"><AV>Preparing modules for first use.</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj><Obj S=\"information\" RefId=\"1\"><TN RefId=\"1\"><T>System.Management.Automation.InformationRecord</T><T>System.Object</T></TN><ToString>Hey, Atomic!</ToString><Props><Obj N=\"MessageData\" RefId=\"2\"><TN RefId=\"2\"><T>System.Management.Automation.HostInformationMessage</T><T>System.Object</T></TN><ToString>Hey, Atomic!</ToString><Props><S N=\"Message\">Hey, Atomic!</S><B N=\"NoNewLine\">false</B><S N=\"ForegroundColor\">DarkYellow</S><S N=\"BackgroundColor\">DarkMagenta</S></Props></Obj><S N=\"Source\">Write-Host</S><DT N=\"TimeGenerated\">2026-05-08T14:05:11.4988698+07:00</DT><Obj N=\"Tags\" RefId=\"3\"><TN RefId=\"3\"><T>System.Collections.Generic.List`1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]</T><T>System.Object</T></TN><LST><S>PSHOST</S></LST></Obj><S N=\"User\">DESKTOP-O1BIM0D\\CodexSandboxOffline</S><S N=\"Computer\">DESKTOP-O1BIM0D</S><U32 N=\"ProcessId\">4252</U32><U32 N=\"NativeThreadId\">1692</U32><U32 N=\"ManagedThreadId\">7</U32></Props></Obj></Objs>\nExit code: 0\nDone executing test: \nT1027-2 Execute base64-encoded PowerShell\n"
+    },
+    {
+      "id": "T1027-7",
+      "technique": "T1027",
+      "test_number": "7",
+      "name": "Obfuscated Command in PowerShell",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALERT"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1027-7 Obfuscated Command in PowerShell\n\nPrerequisites met: \nT1027-7 Obfuscated Command in PowerShell\n",
+      "execution_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nExecuting test: \nT1027-7 Obfuscated Command in PowerShell\n\nHello, from PowerShell!\nExit code: 0\nDone executing test: \nT1027-7 Obfuscated Command in PowerShell\n"
+    },
+    {
+      "id": "T1027-11",
+      "technique": "T1027",
+      "test_number": "11",
+      "name": "Obfuscated PowerShell Command via Character Array",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 5,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW",
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALERT"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1027-11 Obfuscated PowerShell Command via Character Array\n\nPrerequisites met: \nT1027-11 Obfuscated PowerShell Command via Character Array\n",
+      "execution_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nExecuting test: \nT1027-11 Obfuscated PowerShell Command via Character Array\n\nExit code: 0\nDone executing test: \nT1027-11 Obfuscated PowerShell Command via Character Array\n"
+    },
+    {
+      "id": "T1105-10",
+      "technique": "T1105",
+      "test_number": "10",
+      "name": "Windows - PowerShell Download",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1105-10 Windows - PowerShell Download\n\nPrerequisites met: \nT1105-10 Windows - PowerShell Download\n",
+      "execution_output_tail": "T1105-10 Windows - PowerShell Download\n\nException calling \"DownloadFile\" with \"2\" argument(s): \"Unable to connect to the remote server\"\r\nAt line:1 char:4\r\n+ & {(New-Object System.Net.WebClient).DownloadFile(\"https://raw.github ...\r\n+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException\r\n    + FullyQualifiedErrorId : WebException\nExit code: 0\nDone executing test: \nT1105-10 Windows - PowerShell Download\n"
+    },
+    {
+      "id": "T1105-15",
+      "technique": "T1105",
+      "test_number": "15",
+      "name": "File Download via PowerShell",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 2,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1105-15 File Download via PowerShell\n\nPrerequisites met: \nT1105-15 File Download via PowerShell\n",
+      "execution_output_tail": " \r\nInvoke-Item : Cannot find path 'C:\\Users\\sieng\\AppData\\Local\\Temp\\LICENSE.txt' because it does not exist.\r\nAt line:1 char:188\r\n+ ... 71573a/LICENSE.txt') | Out-File LICENSE.txt; Invoke-Item LICENSE.txt}\r\n+                                                  ~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ObjectNotFound: (C:\\Users\\sieng\\...emp\\LICENSE.txt:String) [Invoke-Item], ItemNotFoundEx \r\n   ception\r\n    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.InvokeItemCommand\nExit code: 0\nDone executing test: \nT1105-15 File Download via PowerShell\n"
+    },
+    {
+      "id": "T1082-37",
+      "technique": "T1082",
+      "test_number": "37",
+      "name": "Identify System Locale and Regional Settings with PowerShell",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE",
+        "ALERT"
+      ],
+      "observed_max_verdict": "TERMINATE",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1082-37 Identify System Locale and Regional Settings with PowerShell\n\nPrerequisites met: \nT1082-37 Identify System Locale and Regional Settings with PowerShell\n",
+      "execution_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nExecuting test: \nT1082-37 Identify System Locale and Regional Settings with PowerShell\n\nExit code: 0\nDone executing test: \nT1082-37 Identify System Locale and Regional Settings with PowerShell\n"
+    },
+    {
+      "id": "T1057-3",
+      "technique": "T1057",
+      "test_number": "3",
+      "name": "Process Discovery - Get-Process",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS",
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1057-3 Process Discovery - Get-Process\n\nPrerequisites met: \nT1057-3 Process Discovery - Get-Process\n",
+      "execution_output_tail": "    382      19     6224      20660       0.27   3948   1 taskhostw                                                    \r\n    295      33     7748      15036       1.28   5264   1 taskhostw                                                    \r\n    550      23     9224      31444       1.28   8032   1 TextInputHost                                                \r\n    223      12     3080       9744       3.89   9440   1 UniKeyNT                                                     \r\n    148      11     2300       9040              7204   1 UserOOBEBroker                                               \r\n    167      11     1928       6584              2016   0 VSSVC                                                        \r\n    165      11     1448       5236               772   0 wininit                                                      \r\n    285      13     3708       8956               872   1 winlogon\nExit code: 0\nDone executing test: \nT1057-3 Process Discovery - Get-Process\n"
+    },
+    {
+      "id": "T1083-2",
+      "technique": "T1083",
+      "test_number": "2",
+      "name": "File and Directory Discovery (PowerShell)",
+      "status": "EXECUTED",
+      "passed": true,
+      "error": null,
+      "observed_event_count": 3,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS",
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_max_verdict": "ALERT",
+      "ml_enabled_seen": true,
+      "prereq_output_tail": "PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics\n\nCheckPrereq's for: \nT1083-2 File and Directory Discovery (PowerShell)\n\nPrerequisites met: \nT1083-2 File and Directory Discovery (PowerShell)\n",
+      "execution_output_tail": " \r\ngci : Access to the path 'C:\\Users\\sieng\\AppData\\Local\\Temp\\WinSAT' is denied.\r\nAt line:3 char:1\r\n+ gci -recurse}\r\n+ ~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (C:\\Users\\sieng\\AppData\\Local\\Temp\\WinSAT:String) [Get-ChildItem], Una \r\n   uthorizedAccessException\r\n    + FullyQualifiedErrorId : DirUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetChildItemCommand\nExit code: 0\nDone executing test: \nT1083-2 File and Directory Discovery (PowerShell)\n"
+    }
+  ]
+}

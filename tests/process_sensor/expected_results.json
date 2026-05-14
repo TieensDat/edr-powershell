@@ -1,0 +1,22 @@
+[
+  {"id":"PS001","name":"PowerShell simple command","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS002","name":"PowerShell NoProfile command","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS003","name":"PowerShell ExecutionPolicy Bypass","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS004","name":"PowerShell EncodedCommand","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS005","name":"PowerShell WindowStyle Hidden","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS006","name":"PowerShell long command line","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS007","name":"PowerShell quoted command","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS008","name":"PowerShell command with IEX","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS009","name":"PowerShell command with Invoke-WebRequest","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS010","name":"PowerShell command with Start-Process token","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS011","name":"PowerShell -File script","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS012","name":"PowerShell -Command from script variable","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS013","name":"PowerShell mixed case suspicious args","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS014","name":"PowerShell noninteractive command","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS015","name":"PowerShell command with semicolon chain","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS016","name":"PowerShell command with base64-like token","expected_event":true,"expected_process":"powershell.exe"},
+  {"id":"PS017","name":"cmd.exe should be ignored","expected_event":false,"expected_process":"cmd.exe"},
+  {"id":"PS018","name":"notepad.exe should be ignored","expected_event":false,"expected_process":"notepad.exe"},
+  {"id":"PS019","name":"timeout.exe should be ignored","expected_event":false,"expected_process":"timeout.exe"},
+  {"id":"PS020","name":"plain PowerShell executable without useful command line should be ignored","expected_event":false,"expected_process":"powershell.exe"}
+]

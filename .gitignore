@@ -44,6 +44,10 @@ env/
 PythonAgent/logs/*
 !PythonAgent/logs/.gitkeep
 
+# Python Agent quarantine artifacts
+PythonAgent/quarantine/*
+!PythonAgent/quarantine/.gitkeep
+
 # ML model files
 PythonAgent/model/*
 !PythonAgent/model/.gitkeep

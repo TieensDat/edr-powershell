@@ -36,6 +36,24 @@ ReportChatAgent
    └── DeepSeek Report Generation
 ```
 
+Tai lieu chi tiet cho pipeline `telemetry -> feature extraction -> detection -> response` nam tai:
+
+```text
+docs/python_agent_architecture.md
+```
+
+Bang tong hop ket qua thuc nghiem nam tai:
+
+```text
+docs/experiment_results_summary.md
+```
+
+Phan gioi han cua he thong nam tai:
+
+```text
+docs/system_limitations.md
+```
+
 ## 2. Thành phần
 
 | Thành phần        | Ngôn ngữ | Vai trò                                                                                                                  |

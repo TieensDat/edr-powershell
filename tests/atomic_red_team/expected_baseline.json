@@ -1,0 +1,83 @@
+[
+  {
+    "id": "ART-PS-001",
+    "technique": "T1059.001",
+    "name": "PowerShell EncodedCommand",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-002",
+    "technique": "T1059.001",
+    "name": "PowerShell ExecutionPolicy Bypass",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-003",
+    "technique": "T1059.001",
+    "name": "PowerShell Invoke-Expression",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-004",
+    "technique": "T1059.001",
+    "name": "PowerShell download cradle simulation",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-005",
+    "technique": "T1027",
+    "name": "PowerShell Base64 decode indicator",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-006",
+    "technique": "T1562.001",
+    "name": "Defender disable command simulation",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-007",
+    "technique": "T1562.001",
+    "name": "AMSI bypass string simulation",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-008",
+    "technique": "T1003",
+    "name": "Credential dumping keyword simulation",
+    "expected_min_verdict": "TERMINATE",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-009",
+    "technique": "T1059.001",
+    "name": "Suspicious PowerShell script file execution",
+    "expected_min_verdict": "ALERT",
+    "expected_sources_any": ["file_sensor", "process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  },
+  {
+    "id": "ART-PS-010",
+    "technique": "T1059.001",
+    "name": "Benign PowerShell control",
+    "expected_min_verdict": "ALLOW",
+    "expected_max_verdict": "ALLOW",
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor"],
+    "expected_ml_enabled": true
+  }
+]

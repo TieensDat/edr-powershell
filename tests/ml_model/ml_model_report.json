@@ -1,0 +1,30 @@
+{
+  "run_id": "MLRUN_20260508_105924",
+  "started_at": "2026-05-08T10:59:24.1134717+07:00",
+  "finished_at": "2026-05-08T10:59:24.8670863+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "test_id": "ML001",
+  "marker": "MLRUN_20260508_105924_ML001",
+  "agent_ml_enabled": true,
+  "post_error": null,
+  "response": {
+    "benign_score": 0.0,
+    "ml_confidence": 1.0,
+    "ml_enabled": true,
+    "ml_verdict": "MALICIOUS",
+    "raw_risk_score": 22.0,
+    "risk_level": "HIGH",
+    "risk_score": 22.0,
+    "rule_verdict": "ALERT",
+    "status": "received",
+    "verdict": "TERMINATE"
+  },
+  "event_found": true,
+  "event_ml_enabled": true,
+  "event_ml_verdict": "MALICIOUS",
+  "event_ml_confidence": 1.0,
+  "event_rule_verdict": "ALERT",
+  "event_final_verdict": "TERMINATE",
+  "event_risk_level": "HIGH",
+  "passed": true
+}

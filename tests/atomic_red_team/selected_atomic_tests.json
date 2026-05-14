@@ -1,0 +1,14 @@
+[
+  {"technique":"T1059.001","test_number":"13","name":"ATHPowerShellCommandLineParameter -Command parameter variations"},
+  {"technique":"T1059.001","test_number":"15","name":"ATHPowerShellCommandLineParameter -EncodedCommand parameter variations"},
+  {"technique":"T1059.001","test_number":"17","name":"PowerShell Command Execution"},
+  {"technique":"T1059.001","test_number":"18","name":"PowerShell Invoke Known Malicious Cmdlets"},
+  {"technique":"T1027","test_number":"2","name":"Execute base64-encoded PowerShell"},
+  {"technique":"T1027","test_number":"7","name":"Obfuscated Command in PowerShell"},
+  {"technique":"T1027","test_number":"11","name":"Obfuscated PowerShell Command via Character Array"},
+  {"technique":"T1105","test_number":"10","name":"Windows - PowerShell Download"},
+  {"technique":"T1105","test_number":"15","name":"File Download via PowerShell"},
+  {"technique":"T1082","test_number":"37","name":"Identify System Locale and Regional Settings with PowerShell"},
+  {"technique":"T1057","test_number":"3","name":"Process Discovery - Get-Process"},
+  {"technique":"T1083","test_number":"2","name":"File and Directory Discovery (PowerShell)"}
+]

@@ -1,0 +1,319 @@
+{
+  "run_id": "ATOMICRUN_20260508_112208",
+  "mode": "atomic-red-team-style-safe-powershell-simulation",
+  "note": "Uses safe local simulations aligned to common Atomic Red Team PowerShell techniques; no external Atomic Red Team module was installed on this host.",
+  "started_at": "2026-05-08T11:22:08.6804444+07:00",
+  "finished_at": "2026-05-08T11:22:33.9643324+07:00",
+  "agent_url": "http://127.0.0.1:9001",
+  "agent_health_ok": true,
+  "agent_ml_enabled": true,
+  "event_log_path": "C:\\KLTN\\mini-edr-powershell\\PythonAgent\\logs\\edr_events.jsonl",
+  "test_root": "C:\\KLTN\\mini-edr-powershell\\tests\\atomic_red_team\\runtime_atomic\\ATOMICRUN_20260508_112208",
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "success_rate_percent": 100.0,
+  "expected_baseline_path": "C:\\KLTN\\mini-edr-powershell\\tests\\atomic_red_team\\expected_baseline.json",
+  "results": [
+    {
+      "id": "ART-PS-001",
+      "technique": "T1059.001",
+      "name": "PowerShell EncodedCommand",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-001",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 2,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE",
+        "ALERT"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-002",
+      "technique": "T1059.001",
+      "name": "PowerShell ExecutionPolicy Bypass",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-002",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor"
+      ],
+      "observed_event_count": 2,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT",
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE",
+        "ALERT"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-003",
+      "technique": "T1059.001",
+      "name": "PowerShell Invoke-Expression",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-003",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 1,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALERT"
+      ],
+      "observed_max_severity": 1,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-004",
+      "technique": "T1059.001",
+      "name": "PowerShell download cradle simulation",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-004",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 2,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-005",
+      "technique": "T1027",
+      "name": "PowerShell Base64 decode indicator",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-005",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 1,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "ALERT"
+      ],
+      "observed_max_severity": 1,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-006",
+      "technique": "T1562.001",
+      "name": "Defender disable command simulation",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-006",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 2,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE",
+        "ALERT"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-007",
+      "technique": "T1562.001",
+      "name": "AMSI bypass string simulation",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-007",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 1,
+      "observed_sources": [
+        "process_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-008",
+      "technique": "T1003",
+      "name": "Credential dumping keyword simulation",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-008",
+      "expected_min_verdict": "TERMINATE",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 2,
+      "observed_sources": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-009",
+      "technique": "T1059.001",
+      "name": "Suspicious PowerShell script file execution",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-009",
+      "expected_min_verdict": "ALERT",
+      "expected_max_verdict": "",
+      "expected_sources_any": [
+        "file_sensor",
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 1,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALERT"
+      ],
+      "observed_ml_verdicts": [
+        "MALICIOUS"
+      ],
+      "observed_final_verdicts": [
+        "TERMINATE"
+      ],
+      "observed_max_severity": 2,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    },
+    {
+      "id": "ART-PS-010",
+      "technique": "T1059.001",
+      "name": "Benign PowerShell control",
+      "marker": "ATOMICRUN_20260508_112208_ART-PS-010",
+      "expected_min_verdict": "ALLOW",
+      "expected_max_verdict": "ALLOW",
+      "expected_sources_any": [
+        "process_sensor",
+        "eventlog_4104_sensor"
+      ],
+      "observed_event_count": 1,
+      "observed_sources": [
+        "eventlog_4104_sensor"
+      ],
+      "observed_rule_verdicts": [
+        "ALLOW"
+      ],
+      "observed_ml_verdicts": [
+        "BENIGN"
+      ],
+      "observed_final_verdicts": [
+        "ALLOW"
+      ],
+      "observed_max_severity": 0,
+      "ml_enabled_seen": true,
+      "passed": true,
+      "error": null
+    }
+  ]
+}
