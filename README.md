@@ -48,6 +48,12 @@ Bang tong hop ket qua thuc nghiem nam tai:
 docs/experiment_results_summary.md
 ```
 
+Huong dan chay lai bo test Atomic Red Team tren may moi nam tai:
+
+```text
+docs/atomic_red_team_test_guide.md
+```
+
 Phan gioi han cua he thong nam tai:
 
 ```text
