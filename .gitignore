@@ -52,6 +52,19 @@ PythonAgent/quarantine/*
 PythonAgent/model/*
 !PythonAgent/model/.gitkeep
 
+# Collected external datasets / local evaluation corpora
+datasets/
+
+# Generated test/evaluation reports
+tests/atomic_red_team/logs/
+tests/atomic_red_team/atomic_accuracy_*.csv
+tests/atomic_red_team/atomic_accuracy_*.json
+tests/atomic_red_team/atomic_gap_*.csv
+tests/atomic_red_team/atomic_gap_*.json
+tests/atomic_red_team/demo_atomic_report.json
+tests/verdict_tuning/verdict_tuning_report*.csv
+tests/verdict_tuning/verdict_tuning_report*.json
+
 # OS
 .DS_Store
 Thumbs.db

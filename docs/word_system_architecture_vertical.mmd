@@ -1,0 +1,35 @@
+flowchart TB
+    A["Windows Endpoint Lab<br/>PowerShell / JS / BAT / CMD / EXE"] --> B["Nguồn telemetry"]
+
+    B --> B1["File System<br/>script files"]
+    B --> B2["Process Table<br/>PID, PPID, command line"]
+    B --> B3["Event Log 4104<br/>Script Block Logging"]
+    B --> B4["Windows AMSI<br/>runtime script content"]
+
+    B4 --> C1["AmsiProvider.dll<br/>Custom AMSI Provider"]
+    C1 --> C2["Named Pipe<br/>EdrAmsiPipe"]
+    C2 --> C3["AgentConsole.exe<br/>C++ Bridge Agent"]
+    C3 --> C4["C++ Local Rules<br/>quick verdict"]
+
+    B1 --> D["PythonAgent<br/>central analysis engine"]
+    B2 --> D
+    B3 --> D
+    C3 --> D
+
+    D --> E["Detection<br/>G2.96 Features + Rules + ML"]
+    E --> F["Final Verdict<br/>ALLOW / ALERT / TERMINATE"]
+    F --> G["Response Engine<br/>opt-in, source-aware"]
+    G --> H["Evidence Logs & Reports<br/>JSONL / CSV / Test Reports"]
+
+    H --> I["ReportChatAgent<br/>log correlation & report support"]
+
+    classDef source fill:#E8F1FF,stroke:#2F5F9F,stroke-width:1px,color:#111;
+    classDef native fill:#FFF1D6,stroke:#A66A00,stroke-width:1px,color:#111;
+    classDef python fill:#EAF7EA,stroke:#2E7D32,stroke-width:1px,color:#111;
+    classDef output fill:#F2EAFE,stroke:#6A3FA0,stroke-width:1px,color:#111;
+
+    class B,B1,B2,B3,B4 source;
+    class C1,C2,C3,C4 native;
+    class D,E,F,G python;
+    class H,I output;
+

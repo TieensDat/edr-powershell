@@ -86,6 +86,7 @@ FEATURE_COLUMNS_PATH = os.path.join(MODEL_DIR, "feature_columns.pkl")
 ENABLE_PROCESS_SENSOR = True
 ENABLE_FILE_SENSOR = True
 ENABLE_EVENTLOG_4104_SENSOR = True
+ENABLE_EVENTLOG_4688_SENSOR = True
 ENABLE_RESPONSE = os.environ.get("EDR_ENABLE_RESPONSE", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 def build_watch_paths():
@@ -136,6 +137,15 @@ SUSPICIOUS_PROCESS_NAMES = {
     "regsvr32.exe",
     "reg.exe",
     "schtasks.exe",
+    "msiexec.exe",
+    "sdbinst.exe",
+    "netsh.exe",
+    "wmic.exe",
+    "bitsadmin.exe",
+    "certutil.exe",
+    "hh.exe",
+    "cmstp.exe",
+    "installutil.exe",
 }
 
 PROTECTED_PROCESS_NAMES = {
@@ -164,6 +174,8 @@ PROTECTED_COMMANDLINE_SUBSTRINGS = (
 
 POWERSHELL_EVENT_LOG = "Microsoft-Windows-PowerShell/Operational"
 POWERSHELL_EVENT_ID = 4104
+SECURITY_EVENT_LOG = "Security"
+PROCESS_CREATION_EVENT_ID = 4688
 
 MAX_FILE_READ_BYTES = 1024 * 1024
 FILE_READ_RETRY_COUNT = 5
@@ -235,6 +247,23 @@ def safe_mean(values):
     return sum(values) / len(values)
 
 
+def process_name_from_path(path: str) -> str:
+    return os.path.basename(path or "").lower()
+
+
+def is_relevant_process_telemetry(process_name: str, command_line: str) -> bool:
+    lower_name = (process_name or "").lower()
+    cmdline_lower = (command_line or "").lower()
+
+    if lower_name in SUSPICIOUS_PROCESS_NAMES:
+        return True
+
+    if re.search(r"\b(powershell|pwsh)\b", cmdline_lower):
+        return True
+
+    return False
+
+
 # =====================================================
 # G2.96 HELPERS + PREPROCESSING
 # Adapted from previous Feature_Extraction code.
@@ -265,8 +294,19 @@ def has_pattern(text: str, pattern: str, flags=0) -> int:
     return int(bool(re.search(pattern, text or "", flags)))
 
 
+def strip_authenticode_signature_blocks(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(
+        r"(?im)^\s*#\s*SIG\s*#\s*Begin signature block\s*$[\s\S]*?^\s*#\s*SIG\s*#\s*End signature block\s*$",
+        "",
+        text,
+    )
+
+
 def preprocess_raw(text: str) -> str:
-    return (text or "").replace("\x00", "")
+    text = (text or "").replace("\x00", "")
+    return strip_authenticode_signature_blocks(text)
 
 
 def preprocess_normalized(text: str) -> str:
@@ -307,15 +347,31 @@ def count_base64_strings(text: str, min_len: int = 40) -> int:
     if not text:
         return 0
     pattern = rf"(?<![A-Za-z0-9+/=])(?:[A-Za-z0-9+/]{{{min_len},}}={{0,2}})(?![A-Za-z0-9+/=])"
-    return len(re.findall(pattern, text))
+    return sum(1 for candidate in re.findall(pattern, text) if is_plausible_base64_payload(candidate))
+
+
+def is_plausible_base64_payload(candidate: str) -> bool:
+    if not candidate or len(candidate) < 40:
+        return False
+
+    # Long API paths, URLs and generated type names can match the base64
+    # alphabet. Slash-separated readable words are usually metadata, not a
+    # payload blob.
+    if "/" in candidate and re.search(r"[A-Za-z]{3,}/[A-Za-z]{3,}", candidate):
+        return False
+
+    if re.fullmatch(r"[0-9a-fA-F]+", candidate):
+        return False
+
+    return shannon_entropy(candidate) >= 4.75
 
 
 def has_ascii_char_sequence(text: str) -> int:
     if not text:
         return 0
     patterns = [
-        r'(?:\[char\]\s*"?\d{1,3}"?\s*(?:\+|,)?\s*){3,}',
-        r"(?:\[char\]\s*0x[0-9a-f]{1,2}\s*(?:\+|,)?\s*){3,}",
+        r'(?:\(?\s*\[char\]\s*"?\d{1,3}"?\s*\)?\s*(?:\+|,)?\s*){3,}',
+        r"(?:\(?\s*\[char\]\s*0x[0-9a-f]{1,2}\s*\)?\s*(?:\+|,)?\s*){3,}",
     ]
     return int(any(re.search(p, text, flags=re.IGNORECASE) for p in patterns))
 
@@ -352,6 +408,22 @@ def compute_token_tfidf_features(tokens: list[str], vocab=None, idf=None, prefix
 
 def is_module_manifest(script: str) -> bool:
     s = normalize_compact(script)
+
+    common_manifest_markers = (
+        "moduleversion" in s
+        and "guid" in s
+        and (
+            "rootmodule" in s
+            or "moduleto process" in s
+            or "functionstoexport" in s
+            or "cmdletstoexport" in s
+            or "privatedata" in s
+            or "psdata" in s
+        )
+    )
+    if common_manifest_markers:
+        return True
+
     return (
         "moduleversion" in s
         and "cmdletstoexport" in s
@@ -454,7 +526,7 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
     f["num_long_strings"] = sum(1 for s in strings if len(s) > 100)
     total_literal_len = sum(len(s) for s in strings)
     f["literal_ratio"] = total_literal_len / len(raw) if raw else 0
-    f["has_base64_payload"] = has_pattern(raw, r"[A-Za-z0-9+/=]{50,}")
+    f["has_base64_payload"] = int(count_base64_strings(raw, min_len=50) > 0)
     f["has_hex_string"] = has_pattern(raw, r"0x[0-9A-Fa-f]{8,}")
     f["http_count"] = count_pattern(raw, r"http://", flags=re.IGNORECASE)
     f["httpsG_count"] = count_pattern(raw, r"https://", flags=re.IGNORECASE)
@@ -561,7 +633,7 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
         "has_assembly_load_b64", "noprofile", "bypass_policy", "is_high_entropy",
         "caret_count", "is_mostly_special_chars", "has_disable_name_checking",
         "has_marshal_class", "has_securestring_convert", "has_expand_env_vars",
-        "complex_format_string", "string_reassembly"
+        "complex_format_string", "string_reassembly", "ascii_char_sequence"
     ]])
 
     # === 6. Behavior features ===
@@ -574,6 +646,22 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
     f["wmi_query"] = count_pattern(norm, r"\bget-wmiobject\b")
     f["add_mp_preference"] = count_pattern(norm, r"\b(add|set)-mppreference\b")
     f["clear_eventlog"] = count_pattern(norm, r"\bclear-eventlog\b")
+    raw_lower = raw.lower()
+    has_ps_logging_key = has_pattern(
+        raw_lower,
+        r"scriptblocklogging|enablemodulelogging|modulelogging|transcription|enabletranscripting"
+    )
+    has_ps_logging_disable_value = has_pattern(
+        raw_lower,
+        r"(/d\s+0\b)|(-value\s+0\b)|(\bdword:0{8}\b)"
+    )
+    has_registry_write_command = has_pattern(
+        raw_lower,
+        r"\breg\s+add\b|\bset-itemproperty\b|\bnew-itemproperty\b"
+    )
+    f["has_powershell_logging_disabled"] = int(
+        bool(has_ps_logging_key and has_ps_logging_disable_value and has_registry_write_command)
+    )
     f["powershell_exe"] = has_pattern(norm, r"powershell\s+exe|\Apowershell\b")
     f["cmd_shell"] = has_pattern(norm, r"cmd\s+exe|\bcmd\b.*\b-c\b")
     f["reflected_assembly"] = has_pattern(norm, r"\breflection\s+assembly\s+(load\s|loadfile|loadfrom)\b|\bdefinedynamicassembly\b")
@@ -635,11 +723,12 @@ def extract_features_g296(script: str, event: dict | None = None) -> dict:
         "has_bitstransfer", "has_persistence", "suspicious_process", "has_get_eventlog",
         "has_read_registry", "has_rdp_query", "has_secure_string", "has_pscredential",
         "has_ntdsutil", "has_admin_check", "has_adsi_query", "has_window_scrape",
-        "has_destructive_cmd", "has_acl_manipulation", "has_recurse_param", "has_import_module",
+        "has_destructive_cmd", "has_acl_manipulation",
         "has_event_hook", "has_network_recon", "gc_count", "has_IEX_alias",
         "has_ps_registry_write", "has_invoke_method", "has_call_operator", "has_sqlite_access",
-        "has_com_execution", "has_cred_dump", "has_ps_scheduled_task", "has_dot_sourcing_exec",
-        "has_new_item_file", "has_winforms", "has_batch_syntax", "has_browser_recon"
+        "has_com_execution", "has_cred_dump", "has_ps_scheduled_task",
+        "has_new_item_file", "has_winforms", "has_batch_syntax", "has_browser_recon",
+        "has_powershell_logging_disabled"
     ]])
 
     has_download = (
@@ -717,6 +806,8 @@ def analyze_features(features: dict) -> dict:
         reasons.append("NoProfile execution")
     if features.get("replace_count") or features.get("join_count") or features.get("xor_count"):
         reasons.append("Obfuscation operators")
+    if features.get("ascii_char_sequence"):
+        reasons.append("ASCII/char sequence string reconstruction")
     if features.get("has_fromhexstring") or features.get("has_hex_byte_array"):
         reasons.append("Hex payload indicator")
 
@@ -735,6 +826,8 @@ def analyze_features(features: dict) -> dict:
         reasons.append("Defender configuration modification")
     if features.get("clear_eventlog"):
         reasons.append("Event log clearing behavior")
+    if features.get("has_powershell_logging_disabled"):
+        reasons.append("PowerShell logging disabled")
     if features.get("has_virtualalloc") or features.get("has_createthread") or features.get("has_getprocaddress"):
         reasons.append("Memory injection style API usage")
     if features.get("suspicious_process"):
@@ -767,13 +860,530 @@ def analyze_features(features: dict) -> dict:
 # =====================================================
 # RULE-BASED BASELINE USING G2.96 FEATURES
 # =====================================================
+def memory_injection_indicator_count(features: dict) -> int:
+    return sum(1 for key in [
+        "has_virtualalloc",
+        "has_createthread",
+        "has_getprocaddress",
+        "has_marshal_copy",
+        "has_page_execute",
+        "has_reflection_emit",
+        "has_unsafe_native",
+        "has_definedynamic",
+    ] if features.get(key, 0))
+
+
+def has_direct_download_execution(features: dict) -> bool:
+    return bool(
+        features.get("download_execute_chain")
+        and (
+            features.get("iex_count")
+            or features.get("has_IEX_alias")
+            or features.get("reflected_assembly")
+            or features.get("has_assembly_load_b64")
+            or features.get("has_runspace")
+            or (
+                features.get("has_dot_sourcing_exec")
+                and (
+                    features.get("encoded_cmd")
+                    or features.get("has_base64_payload")
+                    or features.get("num_frombase64")
+                    or features.get("hidden_window")
+                    or features.get("noprofile")
+                )
+            )
+        )
+    )
+
+
+def has_credential_theft_terminate_signal(script: str, features: dict) -> bool:
+    s = normalize_compact(script)
+    raw_lower = (script or "").lower()
+
+    if "mimikatz" in s or "sekurlsa" in s or "logonpasswords" in s or "lsadump" in s:
+        return True
+
+    if is_module_manifest(script):
+        return False
+
+    if features.get("has_cred_dump"):
+        return True
+
+    if "wdigest" in raw_lower and "uselogoncredential" in raw_lower:
+        return True
+
+    return False
+
+
+def has_high_confidence_terminate_signal(script: str, features: dict) -> bool:
+    if has_credential_theft_terminate_signal(script, features):
+        return True
+
+    if features.get("amsi_bypass"):
+        return True
+
+    if features.get("add_mp_preference") or features.get("clear_eventlog") or features.get("has_powershell_logging_disabled"):
+        return True
+
+    if has_direct_download_execution(features):
+        return True
+
+    if memory_injection_indicator_count(features) >= 3:
+        return True
+
+    has_persistence = (
+        features.get("has_persistence") or
+        features.get("reg_add") or
+        features.get("schtasks") or
+        features.get("has_ps_scheduled_task")
+    )
+    has_dynamic_execution = (
+        features.get("iex_count") or
+        features.get("has_IEX_alias") or
+        features.get("reflected_assembly") or
+        features.get("has_runspace") or
+        features.get("has_dot_sourcing_exec")
+    )
+    has_evasive_execution = (
+        features.get("encoded_cmd") or
+        features.get("hidden_window") or
+        features.get("noprofile")
+    )
+    if has_persistence and (has_evasive_execution or has_dynamic_execution):
+        return True
+
+    return False
+
+
+def has_absolute_terminate_signal(script: str, features: dict) -> bool:
+    if has_credential_theft_terminate_signal(script, features):
+        return True
+
+    if features.get("amsi_bypass"):
+        return True
+
+    if features.get("add_mp_preference") or features.get("clear_eventlog") or features.get("has_powershell_logging_disabled"):
+        return True
+
+    if has_direct_download_execution(features):
+        return True
+
+    if memory_injection_indicator_count(features) >= 3:
+        return True
+
+    return False
+
+
+def is_standard_chocolatey_package_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+    path = str(features.get("path", "")).lower()
+
+    chocolatey_script_names = [
+        "chocolateyinstall.ps1",
+        "chocolateyuninstall.ps1",
+        "chocolateybeforemodify.ps1",
+    ]
+    if not any(name in path for name in chocolatey_script_names):
+        return False
+
+    chocolatey_markers = [
+        "install-chocolateypackage",
+        "install-chocolateyzippackage",
+        "get-chocolateywebfile",
+        "uninstall-chocolateypackage",
+        "chocolateybeforemodify",
+        "$env:chocolateyinstall",
+    ]
+    return any(marker in s for marker in chocolatey_markers)
+
+
+def should_cap_chocolatey_terminate_to_alert(script: str, features: dict) -> bool:
+    if not is_standard_chocolatey_package_context(script, features):
+        return False
+
+    if has_absolute_terminate_signal(script, features):
+        return False
+
+    # Chocolatey installers legitimately download installers, touch registry,
+    # modify services/tasks, and sometimes repair PATH/module state. Keep a
+    # visible alert for dual-use installer behavior, but avoid hard response
+    # unless an absolute malicious signal is present.
+    return True
+
+
+def is_benign_admin_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+
+    if has_high_confidence_terminate_signal(script, features):
+        return False
+
+    benign_patterns = [
+        "get-culture",
+        "get-winsystemlocale",
+        "get-process",
+        "get-service",
+        "get-computerinfo",
+        "control panel\\international",
+        "convertto-securestring",
+        "pscredential",
+        "get-winevent",
+    ]
+
+    if any(pattern in s for pattern in benign_patterns):
+        if "clear-eventlog" not in s and "wevtutil cl" not in s:
+            return True
+
+    temp_tokens = ["$env:temp", "\\temp\\", "appdata\\local\\temp"]
+    if any(token in s for token in temp_tokens) and "set-content" in s and "remove-item" in s:
+        return True
+
+    return False
+
+
+def has_strong_runtime_alert_signal(features: dict) -> bool:
+    return any(features.get(key, 0) for key in [
+        "encoded_cmd",
+        "bypass_policy",
+        "hidden_window",
+        "noprofile",
+        "amsi_bypass",
+        "add_mp_preference",
+        "clear_eventlog",
+        "reg_add",
+        "schtasks",
+        "has_ps_registry_write",
+        "has_persistence",
+        "has_certutil",
+        "suspicious_process",
+        "has_bitstransfer",
+        "has_tcp_client",
+        "has_tcp_listener",
+        "has_powershell_logging_disabled",
+        "ascii_char_sequence",
+    ])
+
+
+def has_network_indicator(features: dict) -> bool:
+    return any(features.get(key, 0) for key in [
+        "iwr_count",
+        "num_webclient",
+        "num_downloadfile",
+        "has_webrequest",
+        "http_count",
+        "httpsG_count",
+        "domain_count",
+        "ip_count",
+    ])
+
+
+def is_generated_completer_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+    path = str(features.get("path", "")).lower()
+
+    if has_strong_runtime_alert_signal(features):
+        return False
+
+    if "register-argumentcompleter" not in s and "completer" not in path:
+        return False
+
+    return bool(
+        features.get("iex_count")
+        and "invoke-expression" in s
+        and "cmdlet]" in s
+        and "register-argumentcompleter" in s
+    )
+
+
+def is_benign_base64_data_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+
+    if not (features.get("num_frombase64") or features.get("has_tobase64string")):
+        return False
+
+    if has_strong_runtime_alert_signal(features) or has_direct_download_execution(features):
+        return False
+
+    dynamic_load_markers = [
+        "[scriptblock]::create",
+        "new-module",
+        "assembly]::load",
+        "reflection.assembly",
+        "invoke-expression",
+    ]
+    if any(marker in s for marker in dynamic_load_markers):
+        return False
+
+    benign_data_markers = [
+        "personalaccesstoken",
+        "pat",
+        "environmentvariable",
+        "[environment]::setenvironmentvariable",
+        "utf8.getstring",
+        "unicode.getstring",
+        "encoding]::",
+    ]
+    return any(marker in s for marker in benign_data_markers) or features.get("benign_score", 0) >= 2
+
+
+def is_benign_network_api_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+    path = str(features.get("path", "")).lower()
+
+    if not has_network_indicator(features):
+        return False
+
+    if has_strong_runtime_alert_signal(features) or has_direct_download_execution(features):
+        return False
+
+    if features.get("has_exe_download") or features.get("has_assembly_load_b64"):
+        return False
+
+    api_markers = [
+        "invoke-restmethod",
+        "system.net.webrequest",
+        "soapwebrequest",
+        "uploadfile",
+        "api-version",
+        "authorization",
+        "personalaccesstoken",
+        "appveyor",
+        "dev.azure.com",
+        "azuredevops",
+        "github.com",
+        "api.github",
+        "hp.com",
+        "external.hp.com",
+        "hewlett-packard",
+        "ntp",
+    ]
+    if any(marker in s for marker in api_markers) and features.get("benign_score", 0) >= 3:
+        return True
+
+    benign_path_markers = [
+        "hpwarranty",
+        "vsteam",
+        "powershellforgithub",
+        "buildhelpers",
+        "ntptime",
+    ]
+    if any(marker in path for marker in benign_path_markers) and features.get("benign_score", 0) >= 2:
+        return True
+
+    if features.get("has_pester_test") and not features.get("has_file_write"):
+        return True
+
+    return False
+
+
+def is_chocolatey_au_metadata_update_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+    path = str(features.get("path", "")).lower()
+
+    if not path.endswith("update.ps1"):
+        return False
+
+    if has_strong_runtime_alert_signal(features) or has_direct_download_execution(features):
+        return False
+
+    if any(marker in s for marker in [
+        "install-chocolateypackage",
+        "install-chocolateyzippackage",
+        "start-chocolateyprocessasadmin",
+        "start-process",
+        "schtasks",
+        "new-service",
+        "set-service",
+    ]):
+        return False
+
+    au_markers = [
+        "au_getlatest",
+        "au_searchreplace",
+        "update-package",
+        "update -checksumfor",
+        "chocolatey-au",
+        "checksumfor",
+    ]
+    return any(marker in s for marker in au_markers)
+
+
+def is_chocolatey_local_archive_extract_context(script: str, features: dict) -> bool:
+    s = (script or "").lower()
+    path = str(features.get("path", "")).lower()
+
+    if "chocolateyinstall.ps1" not in path:
+        return False
+
+    if has_strong_runtime_alert_signal(features) or has_high_confidence_terminate_signal(script, features):
+        return False
+
+    if any(marker in s for marker in [
+        "http://",
+        "https://",
+        "invoke-webrequest",
+        "downloadfile",
+        "downloadstring",
+        "get-chocolateywebfile",
+        "install-chocolateypackage",
+        "install-chocolateyzippackage",
+        "start-process",
+        "start-chocolateyprocessasadmin",
+        "reg add",
+        "new-service",
+        "schtasks",
+    ]):
+        return False
+
+    local_archive_markers = [
+        "get-chocolateyunzip",
+        "filefullpath",
+        "get-item \"$toolsdir\\*.zip\"",
+        "get-item \"$toolsdir\\*_x64.zip\"",
+        "get-item \"$toolsdir\\*_x32.zip\"",
+    ]
+    return any(marker in s for marker in local_archive_markers)
+
+
+def is_benign_static_metadata_context(script: str, features: dict) -> bool:
+    if has_strong_runtime_alert_signal(features) or has_high_confidence_terminate_signal(script, features):
+        return False
+
+    path = str(features.get("path", "")).lower()
+    if path.endswith(".psd1") and is_module_manifest(script):
+        return True
+
+    return False
+
+
+def is_benign_test_fixture_context(script: str, features: dict) -> bool:
+    path = str(features.get("path", "")).lower()
+
+    if has_strong_runtime_alert_signal(features) or has_high_confidence_terminate_signal(script, features):
+        return False
+
+    test_path_markers = [
+        "\\tests\\",
+        "/tests/",
+        ".tests.ps1",
+        "__tests__",
+    ]
+    if not any(marker in path for marker in test_path_markers):
+        return False
+
+    if features.get("download_execute_chain") or features.get("decode_execute_chain"):
+        return False
+
+    return features.get("benign_score", 0) >= 3
+
+
+def should_downgrade_low_confidence_rule_alert(script: str, features: dict, analysis: dict) -> bool:
+    if has_high_confidence_terminate_signal(script, features):
+        return False
+
+    if is_chocolatey_au_metadata_update_context(script, features):
+        return True
+
+    risk_level = (analysis.get("risk_level", "LOW") if analysis else "LOW").upper()
+    if risk_level == "HIGH":
+        return False
+
+    return any([
+        is_benign_static_metadata_context(script, features),
+        is_generated_completer_context(script, features),
+        is_benign_base64_data_context(script, features),
+        is_benign_network_api_context(script, features),
+        is_chocolatey_local_archive_extract_context(script, features),
+        is_benign_test_fixture_context(script, features),
+    ])
+
+
+def should_cap_terminate_to_alert(script: str, features: dict, rule_verdict: str) -> bool:
+    if (rule_verdict or "ALLOW").upper() == "TERMINATE":
+        return False
+
+    if has_high_confidence_terminate_signal(script, features):
+        return False
+
+    # Runtime response is intentionally conservative: ML confidence or a
+    # high risk score can escalate to ALERT, but hard termination requires a
+    # high-confidence malicious chain.
+    return True
+
+
+def apply_verdict_policy_tuning(
+    script: str,
+    features: dict,
+    analysis: dict,
+    cpp_verdict: str,
+    rule_verdict: str,
+    ml_verdict: str,
+    ml_confidence: float,
+    final_verdict: str,
+) -> str:
+    rule_verdict = (rule_verdict or "ALLOW").upper()
+    ml_verdict = (ml_verdict or "UNKNOWN").upper()
+    final_verdict = (final_verdict or "ALLOW").upper()
+    cpp_verdict = (cpp_verdict or "ALLOW").upper()
+    risk_level = (analysis.get("risk_level", "LOW") if analysis else "LOW").upper()
+
+    if cpp_verdict == "TERMINATE":
+        return "TERMINATE"
+
+    if rule_verdict == "TERMINATE":
+        if should_cap_chocolatey_terminate_to_alert(script, features):
+            return "ALERT"
+        return "TERMINATE"
+
+    if has_high_confidence_terminate_signal(script, features):
+        if should_cap_chocolatey_terminate_to_alert(script, features):
+            return "ALERT"
+        return "TERMINATE"
+
+    if final_verdict == "TERMINATE" and should_cap_terminate_to_alert(script, features, rule_verdict):
+        final_verdict = "ALERT"
+
+    if (
+        final_verdict == "ALERT"
+        and rule_verdict == "ALERT"
+        and ml_verdict in {"UNKNOWN", "BENIGN"}
+        and should_downgrade_low_confidence_rule_alert(script, features, analysis)
+    ):
+        return "ALLOW"
+
+    if (
+        final_verdict == "ALERT"
+        and rule_verdict == "ALERT"
+        and ml_verdict in {"MALICIOUS", "SUSPICIOUS"}
+        and risk_level in {"LOW", "MEDIUM"}
+        and should_downgrade_low_confidence_rule_alert(script, features, analysis)
+        and not has_high_confidence_terminate_signal(script, features)
+    ):
+        return "ALLOW"
+
+    if (
+        final_verdict == "ALERT"
+        and rule_verdict == "ALLOW"
+        and risk_level in {"LOW", "MEDIUM"}
+        and ml_verdict in {"MALICIOUS", "SUSPICIOUS"}
+        and (
+            is_benign_admin_context(script, features)
+            or should_downgrade_low_confidence_rule_alert(script, features, analysis)
+        )
+    ):
+        return "ALLOW"
+
+    return final_verdict
+
+
 def rule_analyze(script: str, event: dict | None = None, features: dict | None = None) -> str:
     event = event or {}
     features = features or extract_features(script, event)
-    s = normalize_compact(script)
 
     # High-confidence post-exploitation / credential theft.
-    if features.get("has_cred_dump") or "mimikatz" in s or "sekurlsa" in s or "logonpasswords" in s or "lsadump" in s:
+    if has_credential_theft_terminate_signal(script, features):
+        return "TERMINATE"
+
+    if has_high_confidence_terminate_signal(script, features):
         return "TERMINATE"
 
     # Extremely suspicious runtime combination.
@@ -787,7 +1397,8 @@ def rule_analyze(script: str, event: dict | None = None, features: dict | None =
         "num_frombase64", "has_base64_payload", "bypass_policy", "hidden_window", "noprofile",
         "amsi_bypass", "add_mp_preference", "clear_eventlog", "reg_add", "schtasks",
         "has_ps_registry_write", "has_persistence", "has_certutil", "suspicious_process",
-        "has_bitstransfer", "has_tcp_client", "has_tcp_listener", "has_webrequest"
+        "has_bitstransfer", "has_tcp_client", "has_tcp_listener", "has_webrequest",
+        "ascii_char_sequence", "has_powershell_logging_disabled"
     ]
 
     if any(features.get(k, 0) for k in alert_flags):
@@ -882,16 +1493,48 @@ def ml_analyze(features: dict) -> tuple[str, float]:
 # =====================================================
 # VERDICT COMBINATION
 # =====================================================
-def combine_verdict(cpp_verdict: str, rule_verdict: str, ml_verdict: str, ml_confidence: float, risk_level: str) -> str:
+def has_ml_supporting_rule_or_risk_evidence(features: dict, rule_verdict: str, risk_level: str) -> bool:
+    rule_verdict = (rule_verdict or "ALLOW").upper()
+    risk_level = (risk_level or "LOW").upper()
+    features = features or {}
+
+    if rule_verdict in {"ALERT", "TERMINATE"}:
+        return True
+
+    if risk_level == "HIGH":
+        return True
+
+    if has_high_confidence_terminate_signal("", features):
+        return True
+
+    if features.get("download_execute_chain") or features.get("decode_execute_chain"):
+        return True
+
+    if float(features.get("final_risk_score", 0.0) or 0.0) >= G296_HIGH_RISK_THRESHOLD:
+        return True
+
+    return False
+
+
+def combine_verdict(
+    cpp_verdict: str,
+    rule_verdict: str,
+    ml_verdict: str,
+    ml_confidence: float,
+    risk_level: str,
+    features: dict | None = None,
+) -> str:
     cpp_verdict = (cpp_verdict or "ALLOW").upper()
     rule_verdict = (rule_verdict or "ALLOW").upper()
     ml_verdict = (ml_verdict or "UNKNOWN").upper()
     risk_level = (risk_level or "LOW").upper()
+    features = features or {}
+    ml_has_support = has_ml_supporting_rule_or_risk_evidence(features, rule_verdict, risk_level)
 
     if cpp_verdict == "TERMINATE" or rule_verdict == "TERMINATE":
         return "TERMINATE"
 
-    if ml_verdict == "MALICIOUS" and ml_confidence >= ML_MALICIOUS_CONFIDENCE_THRESHOLD:
+    if ml_verdict == "MALICIOUS" and ml_confidence >= ML_MALICIOUS_CONFIDENCE_THRESHOLD and ml_has_support:
         if cpp_verdict == "ALERT" or rule_verdict == "ALERT" or risk_level == "HIGH":
             return "TERMINATE"
         return "ALERT"
@@ -899,7 +1542,7 @@ def combine_verdict(cpp_verdict: str, rule_verdict: str, ml_verdict: str, ml_con
     if cpp_verdict == "ALERT" or rule_verdict == "ALERT":
         return "ALERT"
 
-    if ml_verdict in ["MALICIOUS", "SUSPICIOUS"]:
+    if ml_verdict in ["MALICIOUS", "SUSPICIOUS"] and ml_has_support:
         return "ALERT"
 
     if risk_level == "HIGH":
@@ -1163,6 +1806,17 @@ def build_detection_result(data: dict) -> dict:
         ml_verdict=ml_verdict,
         ml_confidence=ml_confidence,
         risk_level=analysis.get("risk_level", "LOW"),
+        features=features,
+    )
+    final_verdict = apply_verdict_policy_tuning(
+        script=script,
+        features=features,
+        analysis=analysis,
+        cpp_verdict=cpp_verdict,
+        rule_verdict=rule_verdict,
+        ml_verdict=ml_verdict,
+        ml_confidence=ml_confidence,
+        final_verdict=final_verdict,
     )
 
     data["sha256"] = event_hash
@@ -1254,13 +1908,12 @@ def process_sensor():
                 try:
                     proc = psutil.Process(pid)
                     name = proc.name() or ""
-                    lower_name = name.lower()
 
                     cmdline_list = proc.cmdline()
                     cmdline = " ".join(cmdline_list).strip()
                     cmdline_lower = cmdline.lower()
 
-                    if lower_name not in SUSPICIOUS_PROCESS_NAMES and not re.search(r"\b(powershell|pwsh)\b", cmdline_lower):
+                    if not is_relevant_process_telemetry(name, cmdline):
                         continue
 
                     if cmdline_lower.endswith("powershell.exe") or cmdline_lower.endswith("pwsh.exe") or cmdline_lower.endswith("powershell_ise.exe"):
@@ -1485,6 +2138,16 @@ def safe_int(value, default=0):
         return default
 
 
+def safe_pid(value, default=0):
+    try:
+        text = str(value or "").strip()
+        if not text:
+            return default
+        return int(text, 0)
+    except (TypeError, ValueError):
+        return default
+
+
 def xml_text(node):
     return node.text if node is not None and node.text is not None else ""
 
@@ -1640,6 +2303,178 @@ def eventlog_4104_sensor():
 
 
 # =====================================================
+# SENSOR 4: EVENT LOG 4688 PROCESS CREATION SENSOR
+# =====================================================
+def parse_4688_event_xml(xml):
+    result = {
+        "record_id": 0,
+        "event_id": 0,
+        "event_time": "",
+        "computer": "",
+        "new_process_id": 0,
+        "creator_process_id": 0,
+        "new_process_name": "",
+        "command_line": "",
+        "parent_process_name": "",
+        "subject_user_name": "",
+        "subject_domain_name": "",
+    }
+
+    try:
+        root = ET.fromstring(xml)
+        ns = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
+
+        system = root.find("e:System", ns)
+        if system is not None:
+            result["event_id"] = safe_int(xml_text(system.find("e:EventID", ns)), 0)
+            result["record_id"] = safe_int(xml_text(system.find("e:EventRecordID", ns)), 0)
+            result["computer"] = xml_text(system.find("e:Computer", ns))
+
+            time_created = system.find("e:TimeCreated", ns)
+            if time_created is not None:
+                result["event_time"] = time_created.attrib.get("SystemTime", "")
+
+        event_data = root.find("e:EventData", ns)
+        if event_data is not None:
+            for item in event_data.findall("e:Data", ns):
+                name = item.attrib.get("Name", "")
+                value = html.unescape(xml_text(item))
+
+                if name == "NewProcessId":
+                    result["new_process_id"] = safe_pid(value, 0)
+                elif name == "ProcessId":
+                    result["creator_process_id"] = safe_pid(value, 0)
+                elif name == "NewProcessName":
+                    result["new_process_name"] = value
+                elif name == "CommandLine":
+                    result["command_line"] = value
+                elif name == "ParentProcessName":
+                    result["parent_process_name"] = value
+                elif name == "SubjectUserName":
+                    result["subject_user_name"] = value
+                elif name == "SubjectDomainName":
+                    result["subject_domain_name"] = value
+
+    except Exception as e:
+        print("[EVENTLOG 4688 XML PARSE ERROR]", e)
+
+    return result
+
+
+def get_latest_4688_record_id():
+    if win32evtlog is None:
+        return 0
+
+    try:
+        query = "*[System[(EventID=4688)]]"
+
+        handle = win32evtlog.EvtQuery(
+            SECURITY_EVENT_LOG,
+            win32evtlog.EvtQueryReverseDirection,
+            query
+        )
+
+        events = win32evtlog.EvtNext(handle, 1)
+
+        if not events:
+            return 0
+
+        xml = win32evtlog.EvtRender(events[0], win32evtlog.EvtRenderEventXml)
+        return parse_4688_event_xml(xml).get("record_id", 0)
+
+    except Exception as e:
+        print("[EVENTLOG 4688 SENSOR INIT ERROR]", e)
+        return -1
+
+
+def eventlog_4688_sensor():
+    print("[SENSOR] Event Log 4688 Process Creation Sensor started.")
+
+    if win32evtlog is None:
+        print("[EVENTLOG 4688 SENSOR] pywin32 not installed. Sensor disabled.")
+        return
+
+    last_record_id = get_latest_4688_record_id()
+    if last_record_id < 0:
+        print("[EVENTLOG 4688 SENSOR] Cannot read Security 4688. Sensor disabled. It may need Administrator rights and Audit Process Creation.")
+        return
+    if not last_record_id:
+        print("[EVENTLOG 4688 SENSOR] No existing 4688 records found. Check Audit Process Creation and command-line logging.")
+    print(f"[EVENTLOG 4688 SENSOR] Starting from RecordID: {last_record_id}")
+
+    query = "*[System[(EventID=4688)]]"
+
+    while True:
+        try:
+            handle = win32evtlog.EvtQuery(
+                SECURITY_EVENT_LOG,
+                win32evtlog.EvtQueryReverseDirection,
+                query
+            )
+
+            events = win32evtlog.EvtNext(handle, 50)
+            batch = []
+
+            for ev in events:
+                xml = win32evtlog.EvtRender(ev, win32evtlog.EvtRenderEventXml)
+                parsed = parse_4688_event_xml(xml)
+
+                record_id = parsed.get("record_id", 0)
+                if not record_id:
+                    continue
+
+                if record_id <= last_record_id:
+                    continue
+
+                new_process_name = parsed.get("new_process_name", "")
+                command_line = (parsed.get("command_line", "") or "").strip()
+                process_name = process_name_from_path(new_process_name)
+
+                script = command_line
+                if not script or script == "-":
+                    script = new_process_name
+
+                if not script.strip():
+                    continue
+
+                if not is_relevant_process_telemetry(process_name, script):
+                    continue
+
+                batch.append((record_id, parsed, script, process_name))
+
+            batch.sort(key=lambda x: x[0])
+
+            for record_id, parsed, script, process_name in batch:
+                last_record_id = max(last_record_id, record_id)
+
+                parent_process_name = parsed.get("parent_process_name", "")
+                event = {
+                    "source": "eventlog_4688_sensor",
+                    "pid": parsed.get("new_process_id", 0),
+                    "ppid": parsed.get("creator_process_id", 0),
+                    "process": process_name or process_name_from_path(parsed.get("new_process_name", "")),
+                    "parent_process": process_name_from_path(parent_process_name),
+                    "executable_path": parsed.get("new_process_name", ""),
+                    "parent_executable_path": parent_process_name,
+                    "event_id": 4688,
+                    "record_id": record_id,
+                    "event_time": parsed.get("event_time", ""),
+                    "computer": parsed.get("computer", ""),
+                    "subject_user_name": parsed.get("subject_user_name", ""),
+                    "subject_domain_name": parsed.get("subject_domain_name", ""),
+                    "script": script,
+                    "local_verdict": "ALLOW",
+                }
+
+                submit_event(event)
+
+        except Exception as e:
+            print("[EVENTLOG 4688 SENSOR ERROR]", e)
+
+        time.sleep(SENSOR_POLL_INTERVAL_SECONDS)
+
+
+# =====================================================
 # HTTP API
 # =====================================================
 @app.route("/telemetry", methods=["POST"])
@@ -1689,6 +2524,7 @@ def health():
         "process_sensor": ENABLE_PROCESS_SENSOR and psutil is not None,
         "file_sensor": ENABLE_FILE_SENSOR and Observer is not None,
         "eventlog_4104_sensor": ENABLE_EVENTLOG_4104_SENSOR and win32evtlog is not None,
+        "eventlog_4688_sensor": ENABLE_EVENTLOG_4688_SENSOR and win32evtlog is not None,
     }), 200
 
 
@@ -1718,6 +2554,8 @@ if __name__ == "__main__":
         threading.Thread(target=file_sensor, daemon=True).start()
     if ENABLE_EVENTLOG_4104_SENSOR:
         threading.Thread(target=eventlog_4104_sensor, daemon=True).start()
+    if ENABLE_EVENTLOG_4688_SENSOR:
+        threading.Thread(target=eventlog_4688_sensor, daemon=True).start()
 
     print(f"[+] Python EDR Agent listening on http://{HOST}:{PORT}")
     print(f"[+] Feature Extraction: G2.96")

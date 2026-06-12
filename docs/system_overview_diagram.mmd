@@ -1,0 +1,89 @@
+flowchart LR
+    subgraph WIN["Máy Windows / Endpoint Lab"]
+        USER["Người dùng / Mẫu kiểm thử<br/>PowerShell, JS, BAT, CMD, EXE"]
+        PS["PowerShell Runtime"]
+        FSYS["File System<br/>Desktop, Downloads, Documents"]
+        PROC["Process Table<br/>PID, PPID, command line"]
+        EVT["Windows Event Log<br/>PowerShell Operational / 4104"]
+        AMSIAPI["Windows AMSI Interface"]
+    end
+
+    subgraph NATIVE["Native C++ Layer"]
+        PROVIDER["AmsiProvider.dll<br/>Custom AMSI Provider"]
+        PIPE["Named Pipe<br/>\\\\.\\pipe\\EdrAmsiPipe"]
+        CPP["AgentConsole.exe<br/>C++ Native Bridge Agent"]
+        CPPRULE["C++ Local Rules<br/>AMSI quick verdict"]
+        CPPLOG["edr_cpp_agent.log"]
+    end
+
+    subgraph PY["PythonAgent"]
+        API["Flask API<br/>/telemetry, /health, /reload-model"]
+        FILES["File Sensor"]
+        PROCS["Process Sensor"]
+        EV4104["Event Log 4104 Sensor"]
+        NORMAL["Normalize + Queue"]
+        FEATURE["Feature Extraction G2.96"]
+        DETECT["Detection Engine<br/>Rule + ML + Risk Score"]
+        VERDICT["Verdict Combination<br/>ALLOW / ALERT / TERMINATE"]
+        RESPONSE["Response Engine<br/>opt-in, source-aware"]
+    end
+
+    subgraph MODEL["Model & Config"]
+        RF["random_forest_model.pkl"]
+        COLS["feature_columns.pkl"]
+        ENV["Runtime config<br/>EDR_ENABLE_RESPONSE, EDR_WATCH_PATHS"]
+    end
+
+    subgraph OUTPUT["Evidence / Output"]
+        EVENTS["edr_events.jsonl"]
+        FEATURES["edr_features_g296.csv"]
+        QINDEX["quarantine_index.jsonl"]
+        QDIR["PythonAgent/quarantine/"]
+        TESTS["Test reports JSON<br/>sensor, ML, Atomic, response, AMSI"]
+    end
+
+    subgraph REPORT["ReportChatAgent"]
+        RLOAD["Load EDR logs"]
+        RCORR["Correlate events<br/>PID, hash, source, time"]
+        RLLM["DeepSeek / LLM<br/>Generate investigation report"]
+    end
+
+    USER --> PS
+    USER --> FSYS
+    USER --> PROC
+    PS --> EVT
+    PS --> AMSIAPI
+
+    AMSIAPI --> PROVIDER
+    PROVIDER --> PIPE
+    PIPE --> CPP
+    CPP --> CPPRULE
+    CPPRULE --> CPPLOG
+    CPP --> API
+
+    FSYS --> FILES
+    PROC --> PROCS
+    EVT --> EV4104
+    API --> NORMAL
+    FILES --> NORMAL
+    PROCS --> NORMAL
+    EV4104 --> NORMAL
+
+    NORMAL --> FEATURE
+    FEATURE --> DETECT
+    RF --> DETECT
+    COLS --> DETECT
+    ENV --> RESPONSE
+    DETECT --> VERDICT
+    VERDICT --> RESPONSE
+
+    RESPONSE --> EVENTS
+    FEATURE --> FEATURES
+    RESPONSE --> QINDEX
+    RESPONSE --> QDIR
+    EVENTS --> TESTS
+
+    CPPLOG --> RLOAD
+    EVENTS --> RLOAD
+    RLOAD --> RCORR
+    RCORR --> RLLM

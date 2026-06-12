@@ -1,0 +1,775 @@
+# Bổ Sung Theo Góp Ý Giáo Viên Hướng Dẫn
+
+Tài liệu này dùng để bổ sung vào báo cáo khóa luận sau góp ý của GVHD. Nội dung tập trung vào bốn điểm:
+
+1. Thông tin dataset dùng để huấn luyện model.
+2. Phân loại test case malicious/benign và báo cáo TP/FP.
+3. Làm rõ phạm vi lab/prototype.
+4. Kế hoạch đánh giá false positive trên tập benign lớn.
+
+## 1. Bổ Sung Thông Tin Dataset Huấn Luyện Model
+
+Trong khóa luận tốt nghiệp hiện tại, module ML của PythonAgent không huấn luyện lại model từ đầu. Dataset, bộ đặc trưng G2.96 và model Random Forest được kế thừa từ tiểu luận chuyên ngành đã thực hiện trước đó:
+
+```text
+Tiểu luận chuyên ngành:
+Xây dựng hệ thống phát hiện mã độc PowerShell bằng kỹ thuật phân tích tĩnh hành vi và học máy.
+
+Sinh viên thực hiện: Đặng Tiến Đạt
+Mã số sinh viên: 22162010
+```
+
+Vai trò của tiểu luận chuyên ngành là xây dựng bộ dữ liệu, trích xuất đặc trưng tĩnh hành vi G2.96, huấn luyện và đánh giá mô hình học máy cho bài toán phân loại mã độc PowerShell. Vai trò của khóa luận tốt nghiệp hiện tại là kế thừa kết quả đó và tích hợp model vào PythonAgent để đánh giá ở mức hệ thống runtime: telemetry -> feature extraction -> detection -> response.
+
+Model ML hiện tại trong PythonAgent là Random Forest, được nạp từ các artifact:
+
+```text
+PythonAgent/model/random_forest_model.pkl
+PythonAgent/model/feature_columns.pkl
+```
+
+Trong đó:
+
+| Mục | Nội dung |
+|---|---|
+| Model | Random Forest |
+| Feature version | G2.96 |
+| Số đặc trưng | 156 đặc trưng |
+| Model artifact | `PythonAgent/model/random_forest_model.pkl` |
+| Feature columns artifact | `PythonAgent/model/feature_columns.pkl` |
+| Vai trò trong KLTN | Sử dụng để inference trong PythonAgent, không huấn luyện lại trong runtime |
+
+Bộ đặc trưng G2.96 bao gồm các nhóm đặc trưng chính:
+
+- Đặc trưng raw/script structure: độ dài, số dòng, entropy, tỷ lệ ký tự đặc biệt.
+- Đặc trưng payload/encoding: base64, hex, URL, IP/domain, PE header indicator.
+- Đặc trưng obfuscation: EncodedCommand, FromBase64String, join/replace/xor, hidden window.
+- Đặc trưng hành vi: IEX, downloader, registry, scheduled task, Defender tampering, memory API.
+- Đặc trưng benign balancing: comment/help, module/admin scripts, whitelisted download, credential object hợp lệ.
+
+### Thông tin dataset từ tiểu luận chuyên ngành
+
+Dataset huấn luyện model được xây dựng và chứng minh trong tiểu luận chuyên ngành. Dữ liệu sau khi làm sạch được trích xuất thành các file đặc trưng:
+
+```text
+all_features_G2.96_benign.csv
+all_features_G2.96_malicious.csv
+```
+
+Nguồn dữ liệu gốc:
+
+| Nhóm dữ liệu | Nguồn |
+|---|---|
+| Malicious PowerShell | `https://github.com/Fa2y/Malicious-PowerShell-Dataset/tree/main/malicious_samples` |
+| Benign PowerShell | `https://github.com/das-lab/mpsd/tree/main/powershell_benign_dataset` |
+
+Thống kê dataset nội bộ:
+
+| Mục | Giá trị |
+|---|---:|
+| Tổng số mẫu sau làm sạch | 7.935 |
+| Mẫu benign | 4.313 |
+| Mẫu malicious | 3.622 |
+| Tỷ lệ benign/malicious | khoảng 54.4% / 45.6% |
+| Cách chia dữ liệu | 80/20, Stratified Sampling |
+| Train set | khoảng 6.348 mẫu |
+| Test set | khoảng 1.587 mẫu |
+
+Ngoài tập nội bộ, tiểu luận chuyên ngành còn có tập kiểm thử độc lập 417 mẫu gồm các nguồn như MalwareBazaar, Nishang, Azure và Scoop. Tập này được dùng để đánh giá khả năng khái quát hóa của mô hình trên dữ liệu mới, không xuất hiện trong quá trình huấn luyện nội bộ.
+
+### Kết quả model đã được chứng minh trong tiểu luận chuyên ngành
+
+Trên tập kiểm thử nội bộ 1.587 mẫu, Random Forest đạt kết quả:
+
+| Metric | Random Forest |
+|---|---:|
+| Accuracy | 97.23% |
+| Precision | 97.49% |
+| Recall | 96.41% |
+| F1-score | 0.97 |
+
+Confusion matrix của Random Forest trên test set nội bộ:
+
+|  | Predicted Malicious | Predicted Benign |
+|---|---:|---:|
+| Actual Malicious | TP = 698 | FN = 26 |
+| Actual Benign | FP = 18 | TN = 845 |
+
+Trong kiểm thử chéo trên tập dữ liệu độc lập 417 mẫu, model được huấn luyện hoàn toàn trên tập internal 7.935 mẫu và kiểm thử trên external dataset mà không tinh chỉnh thêm. Kết quả nổi bật là Recall đạt 98.93%, phát hiện 185/187 mẫu mã độc. Tuy nhiên, Accuracy giảm còn 57.07% và False Positive Rate cao do nhiều script quản trị Azure/Scoop bị nhận diện nhầm là độc hại. Kết quả này cho thấy model ưu tiên khả năng phát hiện mã độc, nhưng vẫn cần đánh giá false positive trên tập benign lớn trong phạm vi khóa luận hiện tại.
+
+### Tính độc lập giữa dataset huấn luyện và dữ liệu test KLTN
+
+Dataset/model được sử dụng trong KLTN là kết quả kế thừa từ tiểu luận chuyên ngành, còn các test case trong KLTN hiện tại được tạo ra để đánh giá khả năng vận hành của agent trong môi trường lab. Các nhóm test như File Sensor, Process Sensor, Event Log 4104 Sensor, Response Test, AMSI Bridge E2E, Atomic Red Team và workload đo hiệu năng không được đưa vào quá trình huấn luyện model.
+
+Đoạn có thể đưa vào báo cáo:
+
+```text
+Dataset và model Random Forest được kế thừa từ tiểu luận chuyên ngành trước đó, trong đó quá trình xây dựng dataset, trích xuất đặc trưng G2.96, huấn luyện và đánh giá mô hình đã được thực hiện độc lập. Trong khóa luận tốt nghiệp, model này được tích hợp vào PythonAgent để phục vụ inference ở runtime. Các dữ liệu test của khóa luận như File Sensor test, Process Sensor test, Event Log 4104 test, Response test, AMSI Bridge test, Atomic Red Team selected tests và workload đo hiệu năng chỉ được dùng để đánh giá hệ thống agent, không dùng để huấn luyện hoặc tinh chỉnh model.
+```
+
+Lưu ý cần trình bày rõ trong báo cáo:
+
+```text
+Dataset huấn luyện có thể chứa các kỹ thuật PowerShell tương tự như EncodedCommand, obfuscation, downloader hoặc discovery command. Tuy nhiên, các marker/test case sinh ra trong quá trình thực nghiệm KLTN không được đưa vào training set. Vì vậy, kết quả trong KLTN phản ánh khả năng tích hợp và vận hành của agent trên các kịch bản lab/runtime, còn kết quả chất lượng model ML được dẫn lại từ tiểu luận chuyên ngành.
+```
+
+## 2. Bổ Sung Metrics Cho ML Model
+
+Khi trình bày ML Model Test, cần tách rõ hai loại kết quả:
+
+1. Kết quả đánh giá model từ tiểu luận chuyên ngành.
+2. Kết quả integration test trong KLTN hiện tại.
+
+### 2.1. Kết quả đánh giá model từ tiểu luận chuyên ngành
+
+Model Random Forest đã được đánh giá trên test set nội bộ 1.587 mẫu:
+
+| Metric | Giá trị |
+|---|---:|
+| Accuracy | 97.23% |
+| Precision | 97.49% |
+| Recall | 96.41% |
+| F1-score | 0.97 |
+| True Positive | 698 |
+| True Negative | 845 |
+| False Positive | 18 |
+| False Negative | 26 |
+
+Confusion matrix:
+
+|  | Predicted Malicious | Predicted Benign |
+|---|---:|---:|
+| Actual Malicious | 698 | 26 |
+| Actual Benign | 18 | 845 |
+
+Ngoài ra, trên external dataset 417 mẫu, mô hình phát hiện 185/187 mẫu mã độc, Recall đạt 98.93%. Tuy nhiên, False Positive Rate cao trên các script quản trị benign, vì vậy khóa luận hiện tại cần tiếp tục bổ sung đánh giá false positive trên tập benign lớn hơn.
+
+### 2.2. Kết quả integration test trong KLTN hiện tại
+
+Report hiện tại của KLTN:
+
+```text
+tests/ml_model/ml_model_report.json
+```
+
+Report này không phải là đánh giá ML đầy đủ trên dataset, mà là integration test để chứng minh PythonAgent nạp được model và thực hiện inference thành công trên một case malicious.
+
+| Mục | Kết quả hiện tại |
+|---|---|
+| ML enabled | true |
+| ML verdict | MALICIOUS |
+| ML confidence | 1.0 |
+| Final verdict | TERMINATE |
+| Test pass | true |
+
+Khi đưa vào báo cáo, nên ghi rõ:
+
+```text
+Kết quả accuracy, precision, recall, F1-score và confusion matrix được kế thừa từ phần đánh giá model trong tiểu luận chuyên ngành. Trong khóa luận tốt nghiệp, phần ML Model Test hiện tại đóng vai trò kiểm thử tích hợp, xác nhận model artifact có thể được nạp vào PythonAgent và tham gia vào pipeline detection/response.
+```
+
+## 3. Phân Loại Test Case Và TP/FP Hiện Có
+
+Phần này đánh giá khả năng thu thập telemetry của ba sensor chính: File Sensor, Process Sensor và Event Log 4104 Sensor. Đây chưa phải là phép đo chất lượng phân loại mã độc của ML model, do đó không nên diễn giải trực tiếp theo nhãn malicious/benign. Để đảm bảo tính chặt chẽ, nhãn trong nhóm test sensor được định nghĩa theo kỳ vọng telemetry:
+
+| Khái niệm | Định nghĩa trong nhóm sensor test |
+|---|---|
+| Positive / Monitored case | Trường hợp nằm trong phạm vi giám sát, kỳ vọng PythonAgent phải sinh telemetry. |
+| Negative / Noise case | Trường hợp nằm ngoài phạm vi giám sát hoặc được thiết kế để bị bỏ qua, kỳ vọng không sinh telemetry. |
+| TP telemetry | Positive case và agent ghi nhận đúng telemetry. |
+| TN ignored/noise | Negative case và agent bỏ qua đúng. |
+| FP telemetry | Negative case nhưng agent vẫn ghi nhận telemetry. |
+| FN telemetry | Positive case nhưng agent không ghi nhận telemetry. |
+
+Ground truth của từng test case được xác định trước trong script kiểm thử thông qua trường `expected_event`. Bằng chứng quan sát được lấy từ file report JSON, gồm `observed_new_events`, `observed_event_types`, `observed_processes`, `observed_record_ids` và trạng thái `metadata_complete`. Mỗi test case sử dụng marker riêng theo `run_id` để tránh nhầm lẫn với telemetry cũ trong log.
+
+Các chỉ số dùng để tổng hợp:
+
+```text
+Telemetry Recall      = TP / (TP + FN)
+Telemetry Specificity = TN / (TN + FP)
+False Positive Rate   = FP / (FP + TN)
+False Negative Rate   = FN / (FN + TP)
+Success Rate          = Passed / Total
+```
+
+Bảng tổng hợp kết quả ba sensor:
+
+| Sensor | Report | Positive | Negative | TP | TN | FP | FN | Success Rate | Recall | Specificity |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| File Sensor | `tests/file_sensor/file_sensor_report.json` | 15 | 5 | 15 | 5 | 0 | 0 | 100% | 100% | 100% |
+| Process Sensor | `tests/process_sensor/process_sensor_report.json` | 16 | 4 | 16 | 4 | 0 | 0 | 100% | 100% | 100% |
+| Event Log 4104 Sensor | `tests/event_sensor/event_sensor_report.json` | 18 | 2 | 18 | 2 | 0 | 0 | 100% | 100% | 100% |
+
+### 3.1. File Sensor
+
+Mục tiêu của File Sensor test là kiểm tra khả năng phát hiện các thay đổi file script trong watch path, đồng thời xác nhận sensor không sinh telemetry với các file ngoài phạm vi hoặc các trường hợp được thiết kế để bỏ qua.
+
+Đơn vị đánh giá là một sự kiện file trong thư mục giám sát. Điều kiện pass được xác định như sau:
+
+| Loại test | Điều kiện pass |
+|---|---|
+| Positive case | `observed_new_events >= 1` và `observed_event_types` khớp với event type kỳ vọng: `created`, `modified` hoặc `moved`. |
+| Negative case | `observed_new_events = 0`. |
+
+Bằng chứng thực nghiệm:
+
+```text
+Report: tests/file_sensor/file_sensor_report.json
+Run ID: FSRUN_20260507_203232
+Total: 20
+Passed: 20
+Failed: 0
+```
+
+Phân nhóm test case:
+
+| Nhóm | ID | Kịch bản | Kỳ vọng |
+|---|---|---|---|
+| File script được giám sát khi tạo mới | FS001-FS007 | Tạo file `.ps1`, `.psm1`, `.psd1`, `.js`, `.vbs`, `.bat`, `.cmd` | Có telemetry `created` |
+| File script được giám sát khi chỉnh sửa | FS008-FS011 | Sửa nội dung `.ps1`, `.psm1`, `.psd1`, `.js` | Có telemetry `modified` |
+| File script được giám sát khi di chuyển/đổi đuôi | FS012-FS014 | Di chuyển file `.tmp` thành `.ps1`, `.psm1`, `.cmd` | Có telemetry `moved` |
+| Edge case cần đọc lại file | FS015 | Tạo file `.ps1` đang bị lock tạm thời | Có telemetry `created` sau retry |
+| File ngoài phạm vi extension | FS016-FS018 | Tạo `.txt`, `.log`, `.csv` | Không sinh telemetry |
+| Nội dung không đủ điều kiện phân tích | FS019 | Tạo file `.ps1` rỗng | Không sinh telemetry |
+| File vượt giới hạn đọc | FS020 | Tạo file `.ps1` lớn hơn giới hạn đọc | Không sinh telemetry |
+
+Kết quả định lượng:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| TP telemetry | 15 |
+| TN ignored/noise | 5 |
+| FP telemetry | 0 |
+| FN telemetry | 0 |
+| Telemetry Recall | 100% |
+| Telemetry Specificity | 100% |
+| False Positive Rate | 0% |
+| False Negative Rate | 0% |
+
+Nhận xét: kết quả cho thấy File Sensor xử lý đúng ba nhóm hành vi chính gồm tạo mới, chỉnh sửa và di chuyển file script; đồng thời bộ lọc extension, bộ lọc file rỗng và giới hạn kích thước file hoạt động đúng kỳ vọng. Tuy nhiên, kết quả này chỉ chứng minh trên watch path và extension đã cấu hình, chưa đại diện cho toàn bộ hành vi file system trên Windows.
+
+### 3.2. Process Sensor
+
+Mục tiêu của Process Sensor test là kiểm tra khả năng ghi nhận command line của process PowerShell/script interpreter mới xuất hiện, đặc biệt là các biến thể command line thường gặp trong tấn công PowerShell, đồng thời xác nhận sensor không ghi nhận các process ngoài phạm vi.
+
+Đơn vị đánh giá là một process mới được tạo trong thời gian chạy test. Điều kiện pass được xác định như sau:
+
+| Loại test | Điều kiện pass |
+|---|---|
+| Positive case | `observed_new_events >= 1`, `observed_processes` chứa process kỳ vọng và metadata cơ bản đầy đủ. |
+| Negative case | `observed_new_events = 0`. |
+
+Bằng chứng thực nghiệm:
+
+```text
+Report: tests/process_sensor/process_sensor_report.json
+Run ID: PSRUN_20260507_210632
+Total: 20
+Passed: 20
+Failed: 0
+```
+
+Phân nhóm test case:
+
+| Nhóm | ID | Kịch bản | Kỳ vọng |
+|---|---|---|---|
+| PowerShell command cơ bản | PS001-PS002 | Simple command, `NoProfile` | Có telemetry |
+| Tham số có rủi ro cao | PS003-PS005 | `ExecutionPolicy Bypass`, `EncodedCommand`, `WindowStyle Hidden` | Có telemetry |
+| Biến thể command line | PS006-PS007, PS012-PS016 | Long command, quoted command, mixed case, noninteractive, command chain, base64-like token | Có telemetry |
+| Dynamic execution / downloader token | PS008-PS010 | `IEX`, `Invoke-WebRequest`, `Start-Process` token | Có telemetry |
+| Thực thi script file | PS011 | PowerShell `-File` | Có telemetry |
+| Process ngoài phạm vi | PS017-PS019 | `cmd.exe`, `notepad.exe`, `timeout.exe` | Không sinh telemetry |
+| PowerShell không có command line hữu ích | PS020 | Chỉ mở executable PowerShell, không có nội dung phân tích | Không sinh telemetry |
+
+Kết quả định lượng:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| TP telemetry | 16 |
+| TN ignored/noise | 4 |
+| FP telemetry | 0 |
+| FN telemetry | 0 |
+| Telemetry Recall | 100% |
+| Telemetry Specificity | 100% |
+| False Positive Rate | 0% |
+| False Negative Rate | 0% |
+
+Nhận xét: kết quả cho thấy Process Sensor ghi nhận đúng các process PowerShell có command line cần phân tích và không sinh telemetry đối với process thông thường ngoài phạm vi. Điểm cần lưu ý là Process Sensor hoạt động theo cơ chế polling nên kết quả phụ thuộc vào thời gian sống của process, quyền truy cập command line và khoảng lấy mẫu. Vì vậy kết quả 20/20 chứng minh sensor hoạt động đúng trong điều kiện lab đã kiểm soát, chưa khẳng định không bỏ sót mọi process rất ngắn trong môi trường thực tế.
+
+### 3.3. Event Log 4104 Sensor
+
+Mục tiêu của Event Log 4104 Sensor test là kiểm tra khả năng đọc PowerShell Script Block Logging từ Windows Event Log, parse nội dung script block và đưa vào pipeline phân tích của PythonAgent.
+
+Đơn vị đánh giá là một bản ghi Event ID 4104 mới trong log `Microsoft-Windows-PowerShell/Operational`. Điều kiện pass được xác định như sau:
+
+| Loại test | Điều kiện pass |
+|---|---|
+| Positive case | `observed_new_events >= 1`, có `observed_record_ids` mới và metadata cơ bản đầy đủ. |
+| Negative case | `observed_new_events = 0` đối với chương trình không tạo PowerShell 4104. |
+
+Bằng chứng thực nghiệm:
+
+```text
+Report: tests/event_sensor/event_sensor_report.json
+Run ID: EVRUN_20260508_145005
+Total: 20
+Passed: 20
+Failed: 0
+```
+
+Phân nhóm test case:
+
+| Nhóm | ID | Kịch bản | Kỳ vọng |
+|---|---|---|---|
+| Script block thông thường | EV001-EV004 | `Write-Host`, `Write-Output`, `NoProfile`, `ExecutionPolicy Bypass` | Có telemetry từ 4104 |
+| Script block đáng nghi | EV005-EV008 | `EncodedCommand`, `IEX`, `Invoke-WebRequest`, semicolon chain | Có telemetry từ 4104 |
+| Cấu trúc PowerShell đa dạng | EV009-EV018 | Variable assignment, function, script file, multiline script, pipeline, base64-like literal, `Start-Process` literal, quoted marker, here-string, noninteractive command | Có telemetry từ 4104 |
+| Chương trình không sinh 4104 | EV019-EV020 | `cmd.exe`, `notepad.exe` | Không sinh telemetry |
+
+Kết quả định lượng:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| TP telemetry | 18 |
+| TN ignored/noise | 2 |
+| FP telemetry | 0 |
+| FN telemetry | 0 |
+| Telemetry Recall | 100% |
+| Telemetry Specificity | 100% |
+| False Positive Rate | 0% |
+| False Negative Rate | 0% |
+
+Nhận xét: kết quả cho thấy Event Log 4104 Sensor đọc được các script block mới, xử lý được nhiều dạng nội dung PowerShell và bỏ qua đúng các chương trình không tạo Event ID 4104. Giới hạn quan trọng là sensor này phụ thuộc vào việc bật PowerShell Script Block Logging trên Windows. Ngoài ra, Event Log 4104 không cung cấp PID đủ tin cậy cho mọi trường hợp response, vì vậy trong thiết kế hiện tại nguồn `eventlog_4104_sensor` được dùng chủ yếu cho telemetry/detection và log bằng chứng, không dùng làm căn cứ trực tiếp để kill process.
+
+### 3.4. Kết luận cho nhóm sensor test
+
+Ba nhóm sensor test đạt 60/60 test case, trong đó có 49 positive/monitored case và 11 negative/noise case. Không ghi nhận FP telemetry hoặc FN telemetry trong các test đã chạy. Kết quả này chứng minh các sensor chính của PythonAgent hoạt động đúng theo phạm vi thiết kế trong môi trường lab:
+
+- File Sensor kiểm soát được file script trong watch path.
+- Process Sensor ghi nhận được process PowerShell có command line cần phân tích.
+- Event Log 4104 Sensor đọc được PowerShell Script Block Logging.
+
+Khi đưa vào báo cáo, cần nhấn mạnh rằng TP/FP/FN/TN ở mục này là TP/FP/FN/TN theo telemetry, không phải TP/FP/FN/TN của ML model. Phép đo này chứng minh khả năng quan sát và thu thập dữ liệu đầu vào cho pipeline detection, còn chất lượng phân loại malicious/benign của model cần được trình bày riêng ở phần ML evaluation.
+
+## 4. Atomic Red Team
+
+Atomic Red Team là tập kiểm thử hành vi tấn công chuẩn hóa theo MITRE ATT&CK, không phải tập benign. Vì vậy nhóm này dùng để đánh giá khả năng thu thập telemetry và detection với hành vi attack simulation.
+
+Danh sách test:
+
+```text
+tests/atomic_red_team/selected_atomic_tests.json
+```
+
+Các kỹ thuật được chọn:
+
+- T1059.001: PowerShell command execution.
+- T1027: Obfuscated/encoded PowerShell.
+- T1105: PowerShell download.
+- T1082: System discovery.
+- T1057: Process discovery.
+- T1083: File/directory discovery.
+
+### 4.1. Tiêu chí chọn 12 Atomic tests
+
+Bộ 12 Atomic tests không được chọn để đại diện cho toàn bộ MITRE ATT&CK. Đây là tập kiểm thử có chủ đích, dùng để đánh giá đúng phạm vi của prototype hiện tại: phát hiện hành vi PowerShell trong môi trường Windows lab thông qua telemetry từ process command line, PowerShell Script Block Logging 4104, File Sensor và AMSI/C++ bridge ở các kịch bản riêng.
+
+Các tiêu chí chọn test:
+
+| Tiêu chí | Lý do |
+|---|---|
+| Phù hợp phạm vi PowerShell | Đề tài tập trung vào mã độc/hành vi đáng nghi liên quan đến PowerShell, không phải EDR bao phủ toàn bộ Windows attack surface. |
+| Có telemetry quan sát được | Test phải tạo được command line, script block 4104 hoặc nội dung script để PythonAgent phân tích. |
+| Bao phủ nhóm hành vi cốt lõi | Gồm execution, encoded command, obfuscation, download, discovery và known malicious PowerShell cmdlets. |
+| An toàn trong lab | Ưu tiên test không phá hoại hệ thống, không yêu cầu domain thật, không cần exploit kernel/token phức tạp. |
+| Có thể chạy lặp lại | Test phải chạy được trên Windows 10/11 VM với ít phụ thuộc nhất có thể để tạo bằng chứng demo. |
+| Phù hợp mục tiêu chương thực nghiệm | Kịch bản Atomic Red Team dùng để chứng minh telemetry/detection, không dùng để khẳng định agent bao phủ toàn bộ MITRE ATT&CK. |
+
+Như vậy, kết quả `12/12 có telemetry` cần được diễn giải là: agent quan sát được toàn bộ 12 test đã chọn trong phạm vi PowerShell lab. Không nên diễn giải thành tỷ lệ phát hiện cho toàn bộ MITRE ATT&CK hoặc toàn bộ kỹ thuật tấn công Windows.
+
+### 4.2. Các kỹ thuật chưa chọn và lý do
+
+Một số kỹ thuật như T1134, T1055, T1218 và LOLBins có giá trị thực tế, nhưng chưa được đưa vào bộ 12 test đầu tiên vì nằm ngoài trọng tâm trực tiếp hoặc cần kịch bản riêng để đánh giá chặt chẽ hơn.
+
+| Kỹ thuật chưa chọn | Lý do chưa đưa vào bộ 12 test đầu tiên | Hướng xử lý sau |
+|---|---|---|
+| T1134 - Access Token Manipulation | Thường liên quan đến token Windows, privilege context, native API hoặc thao tác cần quyền cao. Prototype hiện tại không thu thập telemetry sâu về token handle/API như một EDR production-grade. | Đưa vào nhóm test mở rộng nếu có kịch bản PowerShell an toàn, có log rõ ràng và không yêu cầu thay đổi đặc quyền nguy hiểm. |
+| T1055 - Process Injection | Process injection qua PowerShell có thể cần shellcode, memory API, payload nhị phân hoặc quyền cao. Đây là nhóm rủi ro cao, dễ bị antivirus/Windows Defender can thiệp và khó chuẩn hóa trong VM demo. | Đánh giá bằng kịch bản riêng, có kiểm soát, tập trung vào dấu hiệu như `VirtualAlloc`, `WriteProcessMemory`, `CreateRemoteThread`, reflective loading. |
+| T1218 - Signed Binary Proxy Execution | T1218 bao gồm nhiều LOLBins như `mshta.exe`, `regsvr32.exe`, `rundll32.exe`. Đây là hành vi proxy execution, không phải lúc nào cũng tạo PowerShell Script Block Logging. | Bổ sung kịch bản LOLBin launching PowerShell để kiểm tra process_sensor và AMSI bridge. |
+| LOLBins launching PowerShell | Agent hiện đã theo dõi các process như `mshta.exe`, `regsvr32.exe`, `rundll32.exe`, `wscript.exe`, `cscript.exe`, nhưng bộ Atomic đầu tiên chưa tập trung vào chuỗi parent process -> PowerShell. | Tạo test mở rộng: `mshta/regsvr32/rundll32/wscript` khởi chạy PowerShell encoded/download command, đo telemetry từ process_sensor và AMSI. |
+
+Điểm quan trọng là việc chưa chọn các kỹ thuật trên không có nghĩa agent đã bao phủ hoặc không cần đánh giá chúng. Đây là giới hạn có chủ đích của kịch bản Atomic Red Team đầu tiên. Các kỹ thuật này nên được đưa vào phần "future work" hoặc "kịch bản thực nghiệm mở rộng" để tránh thiên lệch lựa chọn test.
+
+### 4.3. Kiểm soát nguy cơ bias khi chọn test
+
+Việc chọn test có thể ảnh hưởng lớn đến kết quả. Nếu chỉ chọn các test mà agent đã phát hiện tốt, kết quả sẽ bị thiên lệch. Vì vậy khi viết báo cáo cần nêu rõ các điểm sau:
+
+| Điểm kiểm soát bias | Cách trình bày trong báo cáo |
+|---|---|
+| Không gọi đây là test toàn diện | Ghi rõ đây là 12 Atomic tests được chọn theo phạm vi PowerShell của đề tài. |
+| Không dùng `12/12` như detection rate tổng quát | Chỉ gọi là telemetry success rate trên selected tests. |
+| Công khai kỹ thuật chưa bao phủ | Nêu rõ chưa đánh giá T1134, T1055, T1218 và LOLBin chains trong bộ test đầu tiên. |
+| Bổ sung test mở rộng | Đề xuất chạy thêm nhóm LOLBin, process injection và benign admin scripts ở giai đoạn sau. |
+| Tách malicious/suspicious/benign | Atomic là attack simulation, không thay thế cho tập benign để đo false positive. |
+| Giải thích severity bất thường | Các case như T1082-37 `TERMINATE` cần được thảo luận như nguy cơ false positive hoặc policy quá nhạy. |
+
+Đoạn có thể đưa vào báo cáo:
+
+```text
+Bộ 12 Atomic tests được lựa chọn theo phạm vi nghiên cứu của đề tài, tập trung vào hành vi PowerShell có thể quan sát qua process command line, Event Log 4104 và pipeline phân tích G2.96 của PythonAgent. Bộ test này bao phủ các nhóm hành vi execution, encoded command, obfuscation, download và discovery, nhưng chưa bao phủ toàn bộ MITRE ATT&CK. Các kỹ thuật như Access Token Manipulation, Process Injection và Signed Binary Proxy Execution chưa được đưa vào kịch bản đầu tiên do yêu cầu telemetry, quyền thực thi và mức độ rủi ro khác với phạm vi prototype hiện tại. Vì vậy, kết quả 12/12 chỉ được diễn giải là tỷ lệ ghi nhận telemetry trên tập selected Atomic tests, không phải tỷ lệ phát hiện tổng quát của hệ thống EDR.
+```
+
+### 4.4. So sánh với baseline Windows Defender
+
+Một điểm cần bổ sung để báo cáo chặt chẽ hơn là so sánh tương đối với baseline có sẵn trên Windows. Nếu chỉ trình bày PythonAgent đạt 12/12 telemetry mà không biết Windows Defender có phát hiện/chặn các test đó hay không, thì chưa đủ để chứng minh đóng góp riêng của hệ thống.
+
+Trong phiên bản báo cáo hiện tại, nếu nhóm chưa chạy riêng kịch bản `Windows Defender only`, cần ghi rõ đây là hạn chế của phép đo. Không nên khẳng định PythonAgent tốt hơn Windows Defender khi chưa có số liệu đối chứng.
+
+Quy trình so sánh tối thiểu đề xuất:
+
+| Bước | Cấu hình | Mục tiêu |
+|---|---|---|
+| 1 | Restore VM về checkpoint sạch trước khi chạy Atomic. | Đảm bảo hai lần đo có môi trường giống nhau. |
+| 2 | Bật Windows Defender mặc định, tắt PythonAgent và C++ Agent. | Đo baseline Defender-only. |
+| 3 | Chạy cùng 12 Atomic tests. | Ghi nhận test nào bị Defender cảnh báo/chặn, test nào chạy qua. |
+| 4 | Thu bằng chứng từ Windows Security/Protection History hoặc Windows Defender Operational log. | Có bằng chứng độc lập cho baseline. |
+| 5 | Restore lại checkpoint sạch. | Tránh ảnh hưởng cache/log/artifact từ lần chạy trước. |
+| 6 | Bật PythonAgent/C++ Agent với cùng cấu hình như thực nghiệm. | Đo kết quả hệ thống đề xuất. |
+| 7 | Chạy lại cùng 12 Atomic tests. | So sánh telemetry, verdict, log bằng chứng và response nếu bật. |
+
+Bảng so sánh nên dùng:
+
+| Atomic ID | Windows Defender only | PythonAgent telemetry | PythonAgent verdict | Nhận xét đóng góp |
+|---|---|---|---|---|
+| T1059.001-13 | Chưa đo / Detected / Not detected | Có/Không | ALERT/TERMINATE/ALLOW | PythonAgent có log command/script block và lý do phân loại. |
+| T1105-10 | Chưa đo / Detected / Not detected | Có/Không | ALERT/TERMINATE/ALLOW | PythonAgent chỉ ra downloader behavior như `WebClient.DownloadFile`. |
+| T1082-37 | Chưa đo / Detected / Not detected | Có/Không | ALERT/TERMINATE/ALLOW | Nếu Defender không cảnh báo nhưng PythonAgent TERMINATE thì cần xem xét FP/severity. |
+
+Nếu Windows Defender cũng phát hiện toàn bộ 12 test, đóng góp của PythonAgent không nên trình bày là "phát hiện tốt hơn Defender". Khi đó, đóng góp hợp lý hơn là:
+
+| Đóng góp của PythonAgent | Ý nghĩa |
+|---|---|
+| Telemetry đa nguồn | Ghi nhận process command line, file event, Event Log 4104 và AMSI bridge trong một pipeline thống nhất. |
+| Feature extraction G2.96 | Biến script/command thành đặc trưng hành vi có thể phân tích và lưu lại. |
+| Verdict có thể giải thích | Lưu `rule_verdict`, `ml_verdict`, `risk_score`, `reasons`, giúp phục vụ báo cáo và điều tra. |
+| Response opt-in | Có policy phân biệt source, chỉ xử lý `TERMINATE`, có protected list và quarantine. |
+| Log bằng chứng phục vụ nghiên cứu | Sinh JSONL/CSV/report để đánh giá TP/FP, latency, hiệu năng và case study. |
+| Khả năng tùy biến học thuật | Có thể thay rule, threshold, model và feature set để nghiên cứu giảm false positive. |
+
+Đoạn có thể đưa vào báo cáo:
+
+```text
+Trong phạm vi hiện tại, kết quả Atomic Red Team chứng minh PythonAgent có khả năng thu thập telemetry và phân loại hành vi trên tập test đã chọn. Tuy nhiên, để đánh giá đóng góp so với baseline Windows, cần bổ sung phép đo Defender-only: chạy cùng 12 Atomic tests khi chỉ bật Windows Defender và tắt PythonAgent/C++ Agent, sau đó so sánh với kết quả khi bật hệ thống đề xuất. Nếu Windows Defender cũng phát hiện một số hoặc toàn bộ test, đóng góp của PythonAgent sẽ được trình bày ở khía cạnh telemetry đa nguồn, log bằng chứng, giải thích verdict, khả năng response có kiểm soát và khả năng tùy biến mô hình/rule trong môi trường nghiên cứu, thay vì khẳng định vượt trội về detection rate.
+```
+
+Lưu ý báo cáo:
+
+- `tests/atomic_red_team/selected_atomic_report.json` dùng cho nhóm test selected.
+- `tests/atomic_red_team/selected_atomic_T1059_001_18_report.json` là lần chạy riêng cho `T1059.001-18` bằng quyền phù hợp.
+- Khi tổng hợp 12/12 cần ghi rõ cách hợp nhất hai nguồn report này để tránh nhầm với một report đơn lẻ.
+
+Bảng nên trình bày:
+
+| Atomic ID | Tên test | Nhãn | Telemetry | Max verdict |
+|---|---|---|---:|---|
+| T1059.001-13 | Command parameter variations | malicious/suspicious simulation | Có | TERMINATE |
+| T1059.001-15 | EncodedCommand variations | malicious/suspicious simulation | Có | TERMINATE |
+| T1059.001-17 | PowerShell Command Execution | suspicious simulation | Có | ALERT |
+| T1059.001-18 | Known malicious cmdlets | malicious simulation | Có, chạy riêng | TERMINATE |
+| T1027-2 | Base64-encoded PowerShell | malicious/suspicious simulation | Có | ALERT |
+| T1027-7 | Obfuscated Command | malicious/suspicious simulation | Có | ALERT |
+| T1027-11 | Character array obfuscation | malicious/suspicious simulation | Có | ALERT |
+| T1105-10 | PowerShell Download | malicious/suspicious simulation | Có | TERMINATE |
+| T1105-15 | File Download via PowerShell | malicious/suspicious simulation | Có | TERMINATE |
+| T1082-37 | Locale/regional discovery | suspicious discovery | Có | TERMINATE |
+| T1057-3 | Process discovery | suspicious discovery | Có | ALERT |
+| T1083-2 | File/directory discovery | suspicious discovery | Có | ALERT |
+
+### Lưu ý diễn giải số event trong Atomic Red Team
+
+Số event trong bảng Atomic Red Team là số telemetry thô được ghi nhận trong khoảng thời gian chạy từng Atomic test, không phải số lệnh độc hại duy nhất. Script `run_selected_atomic_tests.ps1` lấy snapshot log trước khi chạy test, sau đó đếm các event mới trong `PythonAgent/logs/edr_events.jsonl`. Vì vậy, một test có thể sinh nhiều event nếu có nhiều process PowerShell, nhiều script block 4104, prereq/module harness hoặc nội dung script bị ghi nhận theo nhiều nguồn telemetry.
+
+Trường hợp cần giải thích rõ là T1059.001-13 so với T1059.001-17:
+
+| Atomic ID | Nội dung | Event | Giải thích |
+|---|---|---:|---|
+| T1059.001-13 | Command parameter variations | 37 | Gọi AtomicTestHarnesses để sinh/thực thi nhiều biến thể tham số command line PowerShell. |
+| T1059.001-17 | PowerShell Command Execution | 2 | Chạy một command execution ngắn qua `powershell.exe -e #{obfuscated_code}`. |
+
+Ví dụ từ Atomic YAML của T1059.001-13:
+
+```text
+Out-ATHPowerShellCommandLineParameter
+  -CommandLineSwitchType Hyphen
+  -CommandParamVariation C
+  -UseEncodedArguments
+  -EncodedArgumentsParamVariation EA
+  -Execute
+  -ErrorAction Stop
+```
+
+Ví dụ từ Atomic YAML của T1059.001-17:
+
+```text
+powershell.exe -e #{obfuscated_code}
+```
+
+Do đó, chênh lệch 37 event và 2 event không có nghĩa là agent xử lý không nhất quán. Nó phản ánh thiết kế test khác nhau: T1059.001-13 là test harness tạo nhiều biến thể command line, còn T1059.001-17 là một lệnh PowerShell ngắn xuất chuỗi `"Hello, from PowerShell!"`. Khi đưa vào báo cáo, nên ghi rõ `observed_event_count` là chỉ số telemetry volume, còn đánh giá pass/fail chính là có telemetry, source ghi nhận đúng và verdict đạt mức kỳ vọng.
+
+Tương tự, không nên so sánh trực tiếp `T1105-10` với `T1059.001-13` chỉ dựa trên số lượng event. `T1105-10` chỉ ghi nhận 3 event, thấp hơn nhiều so với 37 event của `T1059.001-13`, nhưng nội dung hành vi có mức rủi ro cao hơn vì test mô phỏng tải payload từ xa bằng PowerShell.
+
+Ví dụ từ Atomic YAML của T1105-10:
+
+```text
+(New-Object System.Net.WebClient).DownloadFile(
+  "#{remote_file}",
+  "#{destination_path}"
+)
+```
+
+Trong lần chạy thực nghiệm, lệnh download có thể không tải được file do điều kiện mạng, nhưng telemetry vẫn chứa các dấu hiệu có ý nghĩa phát hiện gồm `System.Net.WebClient`, `DownloadFile`, URL từ xa và đường dẫn lưu file. Vì vậy agent chỉ cần một số ít event cũng đủ trích xuất các đặc trưng rủi ro như downloader behavior, WebClient usage và remote payload staging. Đây là lý do `T1105-10` có event count thấp nhưng vẫn đạt max verdict `TERMINATE`.
+
+Bảng diễn giải nên trình bày theo hai trục riêng:
+
+| Atomic ID | Event count | Ý nghĩa event count | Ý nghĩa rủi ro |
+|---|---:|---|---|
+| T1059.001-13 | 37 | Nhiều telemetry do test harness sinh nhiều biến thể command line. | Rủi ro đến từ command execution/parameter variation, nhưng event nhiều không đồng nghĩa nguy hiểm hơn. |
+| T1105-10 | 3 | Ít telemetry vì là một lệnh download tương đối gọn. | Rủi ro cao vì có hành vi tải payload từ xa bằng `WebClient.DownloadFile`. |
+
+Kết luận cần đưa vào báo cáo: số lượng event phản ánh độ “ồn” và cách Atomic test được triển khai, còn mức độ nguy hiểm phải dựa trên nội dung hành vi và đặc trưng detection. Một test ít event vẫn có thể nguy hiểm hơn nếu event đó chứa tín hiệu mạnh như downloader, credential dumping, AMSI bypass hoặc persistence.
+
+### Lưu ý diễn giải T1082-37
+
+T1082-37 là kịch bản discovery về locale/regional settings. Bản thân hành vi đọc locale hệ thống không phải là hành vi mã độc độc lập. Vì vậy, việc test này có max verdict `TERMINATE` cần được giải thích rõ để tránh bị hiểu là false positive không kiểm soát.
+
+Trong report thực nghiệm, T1082-37 có:
+
+| Trường | Giá trị quan sát |
+|---|---|
+| Observed sources | `process_sensor`, `eventlog_4104_sensor` |
+| Observed rule verdicts | `ALERT`, `ALLOW` |
+| Observed ML verdicts | `MALICIOUS` |
+| Observed final verdicts | `TERMINATE`, `ALERT` |
+| Observed max verdict | `TERMINATE` |
+
+Theo logic kết hợp verdict hiện tại của PythonAgent, nếu ML trả về `MALICIOUS` với confidence cao và đồng thời rule/risk context có tín hiệu `ALERT` hoặc `HIGH`, final verdict có thể được nâng lên `TERMINATE`. Do đó, `TERMINATE` trong T1082-37 không xuất phát từ việc hệ thống coi mọi lệnh kiểm tra locale là mã độc, mà xuất phát từ cách kết hợp nhiều tín hiệu trong ngữ cảnh Atomic Red Team.
+
+Khi đưa vào báo cáo, nên diễn giải như sau:
+
+```text
+T1082-37 được tính là telemetry/detection pass vì agent ghi nhận được hành vi discovery trong ngữ cảnh Atomic Red Team. Tuy nhiên, do nội dung test là kiểm tra locale/regional settings, max verdict TERMINATE là điểm cần được thảo luận như nguy cơ false positive hoặc chính sách phân loại còn nhạy với discovery-only command. Trong phiên bản prototype hiện tại, kết quả này được giữ nguyên để phản ánh thực nghiệm, đồng thời được đưa vào nhóm cần tuning. Ở phiên bản cải tiến, nhóm discovery-only nên được cap ở mức ALERT, hoặc chỉ nâng lên TERMINATE khi đi kèm tín hiệu nguy hiểm hơn như EncodedCommand, downloader, credential dumping, AMSI bypass, persistence hoặc chuỗi hành vi nhiều bước.
+```
+
+## 5. Response Test
+
+Mục tiêu của Response Test là kiểm tra chính sách phản hồi tự động của PythonAgent sau khi pipeline detection đã sinh `final_verdict`. Phần này không đánh giá độ chính xác của detection, mà đánh giá xem agent có thực hiện đúng hành động phản hồi theo verdict, source và điều kiện an toàn hay không.
+
+Thiết kế response hiện tại được triển khai theo hướng an toàn cho môi trường lab:
+
+| Nguyên tắc | Ý nghĩa |
+|---|---|
+| Opt-in | Response chỉ hoạt động khi cấu hình bật rõ ràng. |
+| Chỉ xử lý `TERMINATE` | `ALLOW` và `ALERT` chỉ ghi nhận/log, không kill/quarantine. |
+| Phân biệt theo `source` | `process_sensor`, `file_sensor`, `eventlog_4104_sensor`, `amsi_cpp_bridge` có hành động khác nhau. |
+| Protected list | Tránh kill chính agent hoặc process/command line được bảo vệ. |
+| Quarantine có phạm vi | Chỉ quarantine file nằm trong watch path hợp lệ. |
+| Có log bằng chứng | Ghi lại `response_action`, `response_success`, `response_reason`, quarantine path và trạng thái sau response. |
+
+Bằng chứng thực nghiệm:
+
+```text
+tests/response/response_report.json
+```
+
+Thông tin run:
+
+| Nhóm | Kết quả |
+|---|---:|
+| Run ID | RSRUN_20260509_141332 |
+| Response enabled | true |
+| Quarantine path | `PythonAgent/quarantine` |
+| Tổng test | 15 |
+| Passed | 15 |
+| Failed | 0 |
+| Success Rate | 100% |
+
+Ground truth của mỗi test case được xác định bằng hành động response kỳ vọng. Một test được xem là pass khi event được ghi nhận đúng marker, `final_verdict` đúng kỳ vọng, `response_action` đúng chính sách và trạng thái sau response khớp với mục tiêu kiểm thử.
+
+Các nhóm test case:
+
+| Nhóm | ID | Kịch bản | Kỳ vọng |
+|---|---|---|---|
+| Response thật với process | RS001 | Process có verdict `TERMINATE` | `TERMINATE_PROCESS`, process không còn sống sau response |
+| Response thật với file | RS002 | File trong watch path có verdict `TERMINATE` | `QUARANTINE_FILE`, file gốc bị di chuyển, quarantine/index tồn tại |
+| Không xử lý khi chưa đủ mức | RS003-RS005 | Process/file có verdict `ALERT` hoặc `ALLOW` | `response_action = NONE`, process/file vẫn tồn tại |
+| Phân biệt nguồn telemetry | RS006-RS007 | `eventlog_4104_sensor`, `amsi_cpp_bridge` | Eventlog: `LOG_ONLY`; AMSI: `DELEGATED_TO_CPP_AGENT` |
+| Cơ chế bảo vệ an toàn | RS008-RS012 | Protected command line, self PID, thiếu PID/path, path ngoài watch scope | Không thực hiện hành động nguy hiểm, ghi rõ `response_reason` |
+| Tính bền vững/idempotency | RS013-RS014 | File đã quarantine, process đã thoát | Không crash, ghi nhận trạng thái đúng |
+| Health check sau response | RS015 | Kiểm tra `/health` sau toàn bộ test | Agent vẫn `running`, response vẫn enabled |
+
+Kết quả chi tiết theo hành động:
+
+| Response action | Số case | Kết quả |
+|---|---:|---|
+| `TERMINATE_PROCESS` thành công | 1 | RS001 kill đúng target process |
+| `QUARANTINE_FILE` thành công | 1 | RS002 di chuyển file vào quarantine và ghi index |
+| `NONE` đúng chính sách | 3 | RS003-RS005 không xử lý `ALERT`/`ALLOW` |
+| `LOG_ONLY` | 1 | RS006 không kill vì Event Log 4104 thiếu PID tin cậy |
+| `DELEGATED_TO_CPP_AGENT` | 1 | RS007 chuyển trách nhiệm response AMSI cho C++ Agent |
+| Từ chối response vì điều kiện an toàn | 5 | RS008-RS012 ghi lý do: protected/self/missing/outside scope |
+| Idempotent/log-only failure state | 2 | RS013-RS014 xử lý không crash khi file/process đã ở trạng thái cuối |
+| Health check | 1 | RS015 agent vẫn hoạt động sau response |
+
+Kết quả định lượng:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| Tổng test | 15 |
+| Passed | 15 |
+| Failed | 0 |
+| Policy conformance rate | 100% |
+| Unsafe action observed | 0 |
+
+Nhận xét: kết quả cho thấy response hiện tại đã đủ để chứng minh agent có khả năng phản hồi thật trong môi trường lab: kill process đối với telemetry từ process, quarantine file đối với telemetry từ file và delegate response AMSI cho C++ Agent. Quan trọng hơn, test cũng chứng minh các điều kiện an toàn hoạt động đúng: không xử lý `ALERT`/`ALLOW`, không kill chính agent, không quarantine ngoài watch path và không kill Event Log 4104 do thiếu PID tin cậy.
+
+Giới hạn cần ghi rõ trong báo cáo: response hiện tại là prototype/lab response, chưa phải production-grade EDR response. Hệ thống chưa có self-protection đầy đủ, chưa có rollback/restore quarantine hoàn chỉnh, chưa có policy management tập trung và chưa chứng minh trên nhiều loại process/malware thực tế. Vì vậy kết quả 15/15 nên được diễn giải là "đúng theo chính sách response đã thiết kế trong lab", không phải chứng minh khả năng response hoàn chỉnh ở môi trường doanh nghiệp.
+
+## 6. AMSI Bridge E2E
+
+Mục tiêu của AMSI Bridge E2E là kiểm tra đường tích hợp đầy đủ giữa Windows AMSI/C++ Native Agent và PythonAgent. Đây là lớp kiểm thử end-to-end quan trọng vì telemetry không chỉ được gửi trực tiếp tới Flask API, mà đi qua C++ bridge/AMSI provider rồi mới tới PythonAgent.
+
+Pipeline được kiểm thử:
+
+```text
+PowerShell/AMSI client
+-> AmsiProvider.dll hoặc AMSI-style telemetry
+-> AgentConsole.exe / C++ Native AMSI Bridge
+-> HTTP telemetry tới PythonAgent
+-> Feature extraction + rule/ML detection
+-> final_verdict = TERMINATE
+-> PythonAgent delegate response cho C++ Agent
+-> C++ Agent terminate target process
+```
+
+Bằng chứng thực nghiệm:
+
+```text
+tests/amsi_bridge/amsi_bridge_e2e_report.json
+tests/amsi_bridge/registered_amsi_provider_report.json
+```
+
+Hai kịch bản được tách riêng để kiểm tra hai mức tích hợp:
+
+| Kịch bản | Report | Mục tiêu |
+|---|---|---|
+| AMSI Bridge E2E | `tests/amsi_bridge/amsi_bridge_e2e_report.json` | Kiểm tra C++ bridge nhận telemetry kiểu AMSI, forward sang PythonAgent và xử lý response. |
+| Registered AMSI Provider E2E | `tests/amsi_bridge/registered_amsi_provider_report.json` | Kiểm tra provider đã đăng ký với Windows AMSI có thể sinh telemetry thật qua AgentConsole. |
+
+Tiêu chí pass:
+
+| Điều kiện | Ý nghĩa |
+|---|---|
+| PythonAgent health OK | PythonAgent chạy và nhận telemetry. |
+| Response enabled | Cơ chế response đang bật. |
+| `event_found = true` | PythonAgent ghi nhận event từ C++ bridge. |
+| `event_source = amsi_cpp_bridge` | Telemetry đi đúng đường AMSI/C++ bridge. |
+| `event_final_verdict = TERMINATE` | Detection pipeline kết luận cần chặn. |
+| `event_response_action = DELEGATED_TO_CPP_AGENT` | PythonAgent không tự kill mà giao response AMSI cho C++ Agent. |
+| C++ Agent thấy verdict/AMSI PID | C++ Agent nhận được tín hiệu cần terminate target. |
+| `target_alive_after = false` | Target process bị terminate thành công. |
+
+Kết quả tổng hợp:
+
+| Test | Run ID | Event source | Rule verdict | ML verdict | Final verdict | Response action | Target terminated | Kết quả |
+|---|---|---|---|---|---|---|---|---|
+| AMSI Bridge E2E | AMSI_E2E_20260509_150914 | `amsi_cpp_bridge` | ALERT | MALICIOUS | TERMINATE | `DELEGATED_TO_CPP_AGENT` | Có | Pass |
+| Registered AMSI Provider E2E | AMSI_REAL_20260509_152023 | `amsi_cpp_bridge` | ALERT | MALICIOUS | TERMINATE | `DELEGATED_TO_CPP_AGENT` | Có | Pass |
+
+Các bằng chứng chính trong report:
+
+| Bằng chứng | AMSI Bridge E2E | Registered AMSI Provider E2E |
+|---|---|---|
+| PythonAgent health OK | true | true |
+| Python response enabled | true | true |
+| Event được ghi nhận | true | true |
+| C++ forward sang Python | `cpp_saw_python_terminate = true` | `cpp_forwarded_python = true` |
+| C++ terminate target | true | true |
+| Target còn sống sau test | false | false |
+
+Nhận xét: hai test E2E chứng minh luồng AMSI bridge đã hoạt động từ telemetry đến response. Điểm quan trọng là PythonAgent không trực tiếp kill process trong nguồn AMSI; thay vào đó PythonAgent trả verdict và ghi `DELEGATED_TO_CPP_AGENT`, sau đó C++ Agent thực hiện terminate target dựa trên PID/telemetry phía AMSI. Cách thiết kế này hợp lý hơn vì C++ Agent là thành phần gần nguồn AMSI và có ngữ cảnh process đáng tin cậy hơn.
+
+Giới hạn cần ghi rõ trong báo cáo: AMSI Bridge E2E chứng minh đường tích hợp hoạt động trong môi trường lab với provider/AgentConsole đã chuẩn bị sẵn. Kết quả này chưa chứng minh coverage với mọi AMSI client, mọi biến thể PowerShell, mọi tình huống bypass AMSI hoặc khả năng vận hành production như service hardening, code signing, tamper protection và deployment tập trung.
+
+## 7. Làm Rõ Phạm Vi Lab/Prototype
+
+Nên bổ sung vào mục tiêu hoặc tên đề tài:
+
+```text
+Đề tài tập trung xây dựng prototype hệ thống phát hiện và phản hồi hành vi PowerShell đáng nghi trong môi trường Windows lab. Hệ thống được triển khai ở user-mode, phục vụ nghiên cứu kiến trúc telemetry, feature extraction, detection và response cơ bản; chưa hướng tới thay thế EDR production-grade.
+```
+
+Có thể chỉnh tên chương/tiêu đề phụ:
+
+```text
+Xây dựng prototype hệ thống phát hiện và tự động phản hồi hành vi PowerShell đáng nghi trong môi trường Windows lab.
+```
+
+Các giới hạn cần nhắc:
+
+- Chưa có self-protection/tamper protection.
+- Chưa chạy như Windows Service production.
+- Response chỉ là proof-of-concept, opt-in.
+- Event Log 4104 không kill vì thiếu PID tin cậy.
+- Quarantine chỉ áp dụng với file trong watch path.
+- Atomic Red Team là tập selected, không bao phủ toàn MITRE ATT&CK.
+
+## 8. Kế Hoạch Đánh Giá False Positive Trên Tập Benign Lớn
+
+Hiện tại project đã có:
+
+- Normal workload synthetic dùng đo hiệu năng.
+- Sensor negative test cases.
+- Một số benign/noise tests trong File/Process/Event sensors.
+
+Tuy nhiên, project chưa có đánh giá false positive trên tập benign lớn. Cần bổ sung kế hoạch hoặc thực nghiệm riêng.
+
+### Kế hoạch đề xuất
+
+Tạo tập benign gồm:
+
+- Script quản trị Windows/PowerShell hợp lệ.
+- Module PowerShell phổ biến và sạch.
+- Script nội bộ tự viết cho thao tác file/process/event bình thường.
+- Dữ liệu sinh từ normal workload.
+- Các lệnh discovery/admin không độc hại như `Get-Process`, `Get-Service`, `Get-ChildItem`, `Get-Date`, `Write-Output`.
+
+Quy trình:
+
+1. Gán nhãn toàn bộ mẫu là benign.
+2. Chạy qua PythonAgent hoặc offline feature extraction.
+3. Ghi nhận verdict: ALLOW, ALERT, TERMINATE.
+4. Tính false positive:
+
+```text
+False Positive = benign nhưng bị verdict ALERT hoặc TERMINATE
+False Positive Rate = FP / Tổng số benign
+Specificity = TN / (TN + FP)
+```
+
+Bảng cần báo cáo:
+
+| Dataset benign | Số mẫu | ALLOW/TN | ALERT/FP | TERMINATE/FP | FPR |
+|---|---:|---:|---:|---:|---:|
+| Benign PowerShell scripts | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] |
+| Normal workload generated | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] | [CẦN ĐO] |
+
+## 9. Việc Cần Làm Tiếp Theo
+
+1. Đưa số liệu dataset/model từ tiểu luận chuyên ngành vào báo cáo KLTN, kèm nguồn trích dẫn rõ ràng.
+2. Đối chiếu lại các bảng/hình trong tiểu luận chuyên ngành khi copy sang Word để tránh sai lệch số liệu.
+3. Ghi rõ dataset/model được kế thừa từ tiểu luận chuyên ngành, còn các test KLTN chỉ dùng để đánh giá tích hợp hệ thống.
+4. Bổ sung bảng malicious/benign hoặc monitored/noise cho từng nhóm test.
+5. Bổ sung false positive evaluation trên tập benign lớn hoặc ít nhất kế hoạch đánh giá nếu chưa đủ thời gian.
+6. Chỉnh phần mục tiêu/tên đề tài để thể hiện rõ phạm vi lab/prototype.
+

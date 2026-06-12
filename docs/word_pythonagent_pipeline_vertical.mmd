@@ -1,0 +1,41 @@
+flowchart TB
+    A["Telemetry Event<br/>file / process / 4104 / AMSI"] --> B["Normalize Event<br/>source, pid, process, path, script"]
+    B --> C["Noise Filter<br/>bỏ event rỗng, health check, module noise"]
+    C --> D["Dedup<br/>hash script content"]
+    D --> E["Feature Extraction G2.96"]
+
+    E --> E1["Raw Features<br/>length, entropy, line count"]
+    E --> E2["Payload Features<br/>Base64, URL, IP, domain"]
+    E --> E3["Obfuscation Features<br/>EncodedCommand, join, replace, char array"]
+    E --> E4["Behavior Features<br/>IEX, download, registry, Defender tampering"]
+
+    E1 --> F["Detection Engine"]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+
+    F --> F1["Risk Analysis<br/>risk_score, reasons"]
+    F --> F2["Rule Detection<br/>ALLOW / ALERT / TERMINATE"]
+    F --> F3["ML Inference<br/>Random Forest model"]
+
+    F1 --> G["Verdict Combination"]
+    F2 --> G
+    F3 --> G
+
+    G --> H["Final Verdict<br/>ALLOW / ALERT / TERMINATE"]
+    H --> I["Event Queue + Worker"]
+    I --> J["Response Engine"]
+    I --> K["Evidence Logs<br/>edr_events.jsonl<br/>edr_features_g296.csv"]
+
+    classDef input fill:#E8F1FF,stroke:#2F5F9F,stroke-width:1px,color:#111;
+    classDef process fill:#EAF7EA,stroke:#2E7D32,stroke-width:1px,color:#111;
+    classDef feature fill:#FFF1D6,stroke:#A66A00,stroke-width:1px,color:#111;
+    classDef detect fill:#F2EAFE,stroke:#6A3FA0,stroke-width:1px,color:#111;
+    classDef output fill:#FCE8E8,stroke:#B3261E,stroke-width:1px,color:#111;
+
+    class A input;
+    class B,C,D,I process;
+    class E,E1,E2,E3,E4 feature;
+    class F,F1,F2,F3,G,H detect;
+    class J,K output;
+

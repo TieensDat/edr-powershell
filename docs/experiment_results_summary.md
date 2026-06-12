@@ -134,6 +134,10 @@ Ket qua Atomic duoc tong hop tu:
 
 Ket luan: Atomic Red Team cho thay agent co kha nang thu thap telemetry va phan loai cac hanh vi PowerShell lien quan den command execution, encoded command, obfuscation, download va discovery.
 
+Luu y ve event count: `observed_event_count` la so telemetry tho duoc ghi nhan trong thoi gian chay tung Atomic test, khong phai so lenh doc hai duy nhat. Vi du `T1059.001-13` co 37 event vi goi AtomicTestHarnesses `Out-ATHPowerShellCommandLineParameter` de sinh/thuc thi cac bien the tham so command line PowerShell; trong khi `T1059.001-17` chi co 2 event vi la mot command execution ngan dang `powershell.exe -e #{obfuscated_code}`. Vi vay chenh lech event volume phan anh thiet ke test va nguon telemetry, khong phai agent xu ly khong nhat quan.
+
+Luu y dien giai: `T1082-37` la discovery ve locale/regional settings. Ban than lenh doc locale khong tuong duong voi ma doc doc lap. Max verdict `TERMINATE` trong test nay den tu cach ket hop nhieu tin hieu cua pipeline trong ngu canh Atomic Red Team: source telemetry tu `process_sensor` va `eventlog_4104_sensor`, rule co event `ALERT`, va ML tra ve `MALICIOUS`. Vi vay ket qua nay duoc tinh la telemetry/detection pass trong lab, dong thoi can duoc neu nhu mot diem can tuning de giam false positive voi discovery-only command benign.
+
 ## 7. Response Engine
 
 | Chi so | Ket qua |

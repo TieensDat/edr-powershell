@@ -53,7 +53,11 @@ Ghi chu: `T1059.001-18` can quyen Administrator nen duoc chay rieng trong cua so
 
 Ket qua cho thay agent da thu thap duoc telemetry tren tat ca 12 kich ban Atomic Red Team duoc chon. Cac test lien quan den command line va encoded command duoc ghi nhan boi ca `process_sensor` va `eventlog_4104_sensor`, trong khi mot so test chu yeu duoc nhan dien qua `eventlog_4104_sensor`. Dieu nay phu hop voi dac thu cua PowerShell Script Block Logging, vi nhieu hanh vi nguy hiem nam trong noi dung script block thay vi chi nam tren command line.
 
+`observed_event_count` trong bang la so telemetry tho, khong phai so lenh doc hai duy nhat. `T1059.001-13` co 37 event vi goi AtomicTestHarnesses `Out-ATHPowerShellCommandLineParameter` de sinh/thuc thi cac bien the tham so command line PowerShell. `T1059.001-17` chi co 2 event vi la mot command execution ngan dang `powershell.exe -e #{obfuscated_code}`. Chenh lech event volume phan anh thiet ke test va nguon telemetry, khong phai agent xu ly khong nhat quan.
+
 Voi `T1059.001-18`, agent ghi nhan 3 event tu `eventlog_4104_sensor`, ML duoc kich hoat va verdict cao nhat la `TERMINATE`. Day la ket qua phu hop voi baseline mong doi vi test nay goi cac known malicious cmdlets trong PowerShell.
+
+Voi `T1082-37`, can dien giai can than vi day la discovery ve locale/regional settings. Ban than lenh doc locale khong tuong duong voi ma doc doc lap. Max verdict `TERMINATE` trong test nay den tu cach pipeline ket hop nhieu tin hieu trong ngu canh Atomic Red Team: telemetry tu `process_sensor` va `eventlog_4104_sensor`, rule co event `ALERT`, va ML tra ve `MALICIOUS`. Do do ket qua nay duoc tinh la telemetry/detection pass trong lab, nhung dong thoi la diem can tuning de giam nguy co false positive voi discovery-only command benign.
 
 ## 6. Ket luan
 

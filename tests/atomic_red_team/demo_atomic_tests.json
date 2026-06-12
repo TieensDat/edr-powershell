@@ -1,0 +1,17 @@
+﻿[
+    {
+        "technique":  "T1027",
+        "test_number":  "2",
+        "name":  "Execute base64-encoded PowerShell"
+    },
+    {
+        "technique":  "T1027",
+        "test_number":  "11",
+        "name":  "Obfuscated PowerShell Command via Character Array"
+    },
+    {
+        "technique":  "T1105",
+        "test_number":  "15",
+        "name":  "File Download via PowerShell"
+    }
+]

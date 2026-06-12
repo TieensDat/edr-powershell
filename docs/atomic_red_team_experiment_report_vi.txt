@@ -1,0 +1,430 @@
+BÁO CÁO KỊCH BẢN 1: KIỂM THỬ PYTHONAGENT VỚI ATOMIC RED TEAM
+
+Sinh viên thực hiện: Đặng Tiến Đạt (22162010) & Vũ Đình Khang (22162015)
+Ngành / Chuyên ngành: An toàn thông tin
+Tên đề tài: Xây dựng hệ thống phát hiện và tự động ngăn chặn mã độc PowerShell dựa trên phân tích hành vi trong môi trường Windows
+Giảng viên hướng dẫn: ThS. Nguyễn Đăng Quang
+Loại báo cáo: Báo cáo kịch bản thực nghiệm
+Kịch bản thực nghiệm: Kiểm thử PythonAgent với Atomic Red Team
+Môi trường thực hiện: Windows lab / máy ảo kiểm thử
+Thời điểm thực hiện: Tháng 05/2026
+
+Mục đích báo cáo:
+Báo cáo này trình bày quá trình kiểm thử PythonAgent bằng Atomic Red Team, bao gồm mục tiêu thực nghiệm, môi trường triển khai, các bước chạy test, bằng chứng demo và kết quả thu được. Nội dung được dùng làm minh chứng cho phần thực nghiệm của khóa luận tốt nghiệp.
+
+1. Mục tiêu thực nghiệm
+
+Kịch bản này sử dụng Atomic Red Team để đánh giá khả năng thu thập telemetry và phân loại hành vi PowerShell đáng nghi của PythonAgent. Đây là nhóm kiểm thử tấn công chuẩn hóa dựa trên MITRE ATT&CK, phù hợp để đánh giá hệ thống trong môi trường lab.
+
+Mục tiêu chính của thực nghiệm:
+- Kiểm tra PythonAgent có thu thập được telemetry khi PowerShell thực thi các hành vi đáng nghi hay không.
+- Đánh giá khả năng quan sát của các sensor chính, đặc biệt là process_sensor và eventlog_4104_sensor.
+- Kiểm tra module phân tích có sinh verdict ALERT hoặc TERMINATE đối với các hành vi rủi ro hay không.
+- Tạo bằng chứng thực nghiệm phục vụ chương đánh giá của khóa luận tốt nghiệp.
+
+Phạm vi của kịch bản này tập trung vào telemetry và detection. Response không phải mục tiêu chính trong kịch bản Atomic Red Team này.
+
+2. Môi trường thực nghiệm
+
+Project: C:\KLTN\mini-edr-powershell
+Agent endpoint: http://127.0.0.1:9001
+Atomic tests: tests\atomic_red_team\selected_atomic_tests.json
+Atomic Red Team path: C:\AtomicRedTeam\atomics
+Report chính: tests\atomic_red_team\selected_atomic_report.json
+Report riêng cho T1059.001-18: tests\atomic_red_team\selected_atomic_T1059_001_18_report.json
+Log telemetry: PythonAgent\logs\edr_events.jsonl
+ML model: đã được bật trong quá trình test
+
+Các thành phần cần có:
+- PowerShell 7 (pwsh).
+- Invoke-AtomicRedTeam.
+- AtomicTestHarnesses.
+- PowerShell Script Block Logging, Event ID 4104.
+- PythonAgent đang chạy và endpoint /health trả về trạng thái running.
+
+3. Danh sách Atomic tests được chọn
+
+Kịch bản sử dụng 12 Atomic tests phù hợp với phạm vi phát hiện hành vi PowerShell của đề tài:
+
+1. T1059.001-13: PowerShell command parameter variations.
+2. T1059.001-15: PowerShell encoded command parameter variations.
+3. T1059.001-17: PowerShell command execution.
+4. T1059.001-18: PowerShell invoke known malicious cmdlets.
+5. T1027-2: Execute base64-encoded PowerShell.
+6. T1027-7: Obfuscated command in PowerShell.
+7. T1027-11: Obfuscated PowerShell command via character array.
+8. T1105-10: Windows PowerShell download.
+9. T1105-15: File download via PowerShell.
+10. T1082-37: Identify system locale and regional settings with PowerShell.
+11. T1057-3: Process discovery with Get-Process.
+12. T1083-2: File and directory discovery with PowerShell.
+
+4. Quy trình thực hiện
+
+Quy trình kiểm thử được thực hiện theo các bước sau:
+
+Bước 1: Khởi động PythonAgent.
+Bước 2: Kiểm tra trạng thái agent thông qua endpoint http://127.0.0.1:9001/health.
+Bước 3: Chạy script tests\atomic_red_team\run_selected_atomic_tests.ps1.
+Bước 4: Script đọc danh sách test từ selected_atomic_tests.json.
+Bước 5: Script gọi Invoke-AtomicRedTeam để thực thi từng Atomic test.
+Bước 6: Sau mỗi test, script chờ agent thu thập telemetry.
+Bước 7: Script đọc log PythonAgent\logs\edr_events.jsonl.
+Bước 8: Script tổng hợp source, số lượng event, rule verdict, ML verdict và final verdict.
+Bước 9: Kết quả được ghi vào file selected_atomic_report.json.
+
+Lệnh chạy bộ test chính:
+
+pwsh -NoProfile -ExecutionPolicy Bypass `
+  -File .\tests\atomic_red_team\run_selected_atomic_tests.ps1 `
+  -AtomicsPath "C:\AtomicRedTeam\atomics" `
+  -SelectedTestsPath ".\tests\atomic_red_team\selected_atomic_tests.json" `
+  -ReportPath ".\tests\atomic_red_team\selected_atomic_report.json" `
+  -TimeoutSeconds 45 `
+  -SettleSeconds 6
+
+Ghi chú: Test T1059.001-18 yêu cầu quyền Administrator nên được chạy riêng bằng PowerShell Administrator. Kết quả cuối cùng của 12 test được tổng hợp từ report chính và report riêng của test T1059.001-18.
+
+5. Các bước thực hiện test, câu lệnh sử dụng và hình ảnh chứng minh
+
+Phần này mô tả các bước có thể thực hiện khi demo trực tiếp hoặc khi chạy lại thực nghiệm Atomic Red Team trên máy lab. Mục tiêu là chứng minh được luồng: Atomic Red Team thực thi hành vi PowerShell, PythonAgent thu thập telemetry, phân tích hành vi và ghi kết quả ra report.
+
+5.1. Bước 1: Mở PowerShell tại thư mục project
+
+Mở PowerShell hoặc PowerShell 7, sau đó chuyển tới thư mục project:
+
+cd C:\KLTN\mini-edr-powershell
+
+Hình ảnh cần chụp:
+Hình 1: Terminal đang đứng tại thư mục C:\KLTN\mini-edr-powershell.
+
+5.2. Bước 2: Khởi động PythonAgent
+
+Chạy PythonAgent bằng script có sẵn:
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_python_agent.ps1 -Force
+
+Kiểm tra trạng thái agent:
+
+Invoke-RestMethod http://127.0.0.1:9001/health
+
+Kết quả mong đợi:
+- status = running
+- ml_enabled = true
+- process_sensor = true
+- eventlog_4104_sensor = true
+
+Hình ảnh cần chụp:
+Hình 2: Kết quả kiểm tra /health cho thấy PythonAgent đang chạy và các sensor cần thiết đã được bật.
+
+5.3. Bước 3: Xóa log/report demo cũ để kết quả dễ quan sát
+
+Trước khi demo, có thể xóa log và report cũ để kết quả mới không bị lẫn với lần chạy trước:
+
+Remove-Item .\PythonAgent\logs\edr_events.jsonl -Force -ErrorAction SilentlyContinue
+Remove-Item .\PythonAgent\logs\edr_features_g296.csv -Force -ErrorAction SilentlyContinue
+Remove-Item .\tests\atomic_red_team\demo_atomic_report.json -Force -ErrorAction SilentlyContinue
+
+Hình ảnh cần chụp:
+Không bắt buộc. Đây là bước chuẩn bị để kết quả demo sạch hơn.
+
+5.4. Bước 4: Tạo file danh sách Atomic tests dùng cho demo
+
+Để demo nhanh, có thể chọn 3 test tiêu biểu thay vì chạy toàn bộ 12 test. Tạo file:
+
+tests\atomic_red_team\demo_atomic_tests.json
+
+Nội dung file:
+
+[
+  {
+    "technique": "T1027",
+    "test_number": "2",
+    "name": "Execute base64-encoded PowerShell"
+  },
+  {
+    "technique": "T1027",
+    "test_number": "11",
+    "name": "Obfuscated PowerShell Command via Character Array"
+  },
+  {
+    "technique": "T1105",
+    "test_number": "15",
+    "name": "File Download via PowerShell"
+  }
+]
+
+Nếu muốn tạo file bằng lệnh PowerShell, có thể dùng:
+
+@(
+  [pscustomobject]@{
+    technique = "T1027"
+    test_number = "2"
+    name = "Execute base64-encoded PowerShell"
+  },
+  [pscustomobject]@{
+    technique = "T1027"
+    test_number = "11"
+    name = "Obfuscated PowerShell Command via Character Array"
+  },
+  [pscustomobject]@{
+    technique = "T1105"
+    test_number = "15"
+    name = "File Download via PowerShell"
+  }
+) | ConvertTo-Json -Depth 4 | Set-Content .\tests\atomic_red_team\demo_atomic_tests.json -Encoding UTF8
+
+Hình ảnh cần chụp:
+Hình 3: File demo_atomic_tests.json hiển thị danh sách các Atomic tests được chọn để demo.
+
+5.5. Bước 5: Chạy Atomic Red Team test
+
+Nếu Atomic Red Team được đặt tại C:\AtomicRedTeam\atomics, chạy lệnh:
+
+pwsh -NoProfile -ExecutionPolicy Bypass `
+  -File .\tests\atomic_red_team\run_selected_atomic_tests.ps1 `
+  -AtomicsPath "C:\AtomicRedTeam\atomics" `
+  -SelectedTestsPath ".\tests\atomic_red_team\demo_atomic_tests.json" `
+  -ReportPath ".\tests\atomic_red_team\demo_atomic_report.json" `
+  -TimeoutSeconds 45 `
+  -SettleSeconds 6
+
+Nếu Atomic Red Team nằm trong thư mục clone repo, ví dụ C:\AtomicRedTeam\atomic-red-team\atomics, thay tham số -AtomicsPath như sau:
+
+-AtomicsPath "C:\AtomicRedTeam\atomic-red-team\atomics"
+
+Kết quả mong đợi trên terminal:
+- Selected bằng số test trong file demo.
+- Executed bằng số test đã chạy.
+- Executed with telemetry lớn hơn 0.
+- Telemetry success rate đạt 100% nếu toàn bộ test đều có telemetry.
+- Report được ghi vào tests\atomic_red_team\demo_atomic_report.json.
+
+Hình ảnh cần chụp:
+Hình 4: Terminal hiển thị kết quả chạy Atomic Red Team, gồm số test được chọn, số test đã chạy, số test có telemetry và telemetry success rate.
+
+5.6. Bước 6: Đọc kết quả tổng hợp từ report JSON
+
+Chạy lệnh:
+
+$r = Get-Content .\tests\atomic_red_team\demo_atomic_report.json -Raw | ConvertFrom-Json
+$r | Select-Object total_selected, executed, skipped_prereq, errors, executed_with_telemetry, telemetry_success_rate_percent
+
+Xem kết quả từng test:
+
+$r.results | Select-Object id, status, observed_event_count, observed_sources, observed_max_verdict
+
+Kết quả mong đợi:
+- observed_event_count > 0.
+- observed_sources có process_sensor hoặc eventlog_4104_sensor.
+- observed_max_verdict là ALERT hoặc TERMINATE.
+
+Hình ảnh cần chụp:
+Hình 5: Kết quả đọc demo_atomic_report.json, thể hiện từng Atomic ID, số event quan sát được, source ghi nhận và max verdict.
+
+5.7. Bước 7: Kiểm tra telemetry log của PythonAgent
+
+Xem các event cuối cùng trong log:
+
+Get-Content .\PythonAgent\logs\edr_events.jsonl -Tail 5
+
+Xem một event theo dạng rút gọn:
+
+Get-Content .\PythonAgent\logs\edr_events.jsonl -Tail 1 | ConvertFrom-Json |
+  Select-Object source, process, rule_verdict, ml_enabled, ml_verdict, final_verdict
+
+Hình ảnh cần chụp:
+Hình 6: Log edr_events.jsonl thể hiện source, rule_verdict, ml_verdict và final_verdict của event được PythonAgent ghi nhận.
+
+5.8. Bước 8: Dừng PythonAgent sau khi demo
+
+Sau khi hoàn tất demo, dừng agent:
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_python_agent.ps1
+
+Hình ảnh cần chụp:
+Không bắt buộc.
+
+5.9. Trường hợp chạy lại toàn bộ 12 Atomic tests
+
+Nếu cần chạy lại toàn bộ 12 test thay vì demo 3 test, sử dụng file danh sách chính:
+
+tests\atomic_red_team\selected_atomic_tests.json
+
+Lệnh chạy:
+
+pwsh -NoProfile -ExecutionPolicy Bypass `
+  -File .\tests\atomic_red_team\run_selected_atomic_tests.ps1 `
+  -AtomicsPath "C:\AtomicRedTeam\atomics" `
+  -SelectedTestsPath ".\tests\atomic_red_team\selected_atomic_tests.json" `
+  -ReportPath ".\tests\atomic_red_team\selected_atomic_report.json" `
+  -TimeoutSeconds 45 `
+  -SettleSeconds 6
+
+Ghi chú: T1059.001-18 có thể cần chạy riêng bằng PowerShell Administrator do yêu cầu elevation.
+
+5.10. Bằng chứng file sau khi chạy test
+
+Các file cần lưu lại để chứng minh kết quả:
+- tests\atomic_red_team\demo_atomic_report.json hoặc tests\atomic_red_team\selected_atomic_report.json
+- tests\atomic_red_team\selected_atomic_T1059_001_18_report.json nếu chạy riêng T1059.001-18
+- PythonAgent\logs\edr_events.jsonl
+- PythonAgent\logs\edr_features_g296.csv
+
+6. Kết quả tổng hợp
+
+Sau khi ghép kết quả từ report chính và report riêng của T1059.001-18, kết quả thực nghiệm như sau:
+
+Tổng số Atomic tests: 12
+Số test đã thực thi: 12
+Số test có telemetry: 12
+Tỷ lệ telemetry thành công: 100%
+Tổng số event agent ghi nhận: 93
+Số test có max verdict TERMINATE: 6
+Số test có max verdict ALERT: 6
+Số test có max verdict ALLOW: 0
+ML model: được bật trong quá trình test
+
+7. Kết quả từng test
+
+T1059.001-13
+Nội dung: PowerShell command parameter variations.
+Telemetry events: 37.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1059.001-15
+Nội dung: PowerShell encoded command parameter variations.
+Telemetry events: 25.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1059.001-17
+Nội dung: PowerShell command execution.
+Telemetry events: 2.
+Source ghi nhận: eventlog_4104_sensor.
+Max verdict: ALERT.
+
+T1059.001-18
+Nội dung: PowerShell invoke known malicious cmdlets.
+Telemetry events: 3.
+Source ghi nhận: eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1027-2
+Nội dung: Execute base64-encoded PowerShell.
+Telemetry events: 4.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: ALERT.
+
+T1027-7
+Nội dung: Obfuscated command in PowerShell.
+Telemetry events: 3.
+Source ghi nhận: eventlog_4104_sensor.
+Max verdict: ALERT.
+
+T1027-11
+Nội dung: Obfuscated PowerShell command via character array.
+Telemetry events: 5.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: ALERT.
+
+T1105-10
+Nội dung: Windows PowerShell download.
+Telemetry events: 3.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1105-15
+Nội dung: File download via PowerShell.
+Telemetry events: 2.
+Source ghi nhận: eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1082-37
+Nội dung: Identify system locale and regional settings with PowerShell.
+Telemetry events: 3.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: TERMINATE.
+
+T1057-3
+Nội dung: Process discovery with Get-Process.
+Telemetry events: 3.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: ALERT.
+
+T1083-2
+Nội dung: File and directory discovery with PowerShell.
+Telemetry events: 3.
+Source ghi nhận: process_sensor, eventlog_4104_sensor.
+Max verdict: ALERT.
+
+8. Phân tích kết quả
+
+Kết quả cho thấy PythonAgent ghi nhận được telemetry trong toàn bộ 12 Atomic tests được chọn. Các test liên quan đến command line và encoded command được ghi nhận bởi cả process_sensor và eventlog_4104_sensor. Các test có hành vi chính nằm trong nội dung script block được ghi nhận chủ yếu bởi eventlog_4104_sensor.
+
+Hai test T1059.001-13 và T1059.001-15 tạo nhiều biến thể command line nên có số lượng event cao nhất, lần lượt là 37 và 25 event. Đây là hai test quan trọng để đánh giá khả năng quan sát command line PowerShell và encoded command.
+
+Lưu ý về cách hiểu số lượng event: số event trong report Atomic hiện tại là số telemetry thô được ghi nhận sau khi chạy từng Atomic test, không phải số lệnh độc hại duy nhất. Một Atomic test có thể sinh nhiều event do nhiều nguyên nhân: lệnh prereq, module test harness, process_sensor ghi nhận command line, eventlog_4104_sensor ghi nhận script block, hoặc một nội dung PowerShell bị tách thành nhiều script block. Vì vậy, số event dùng để chứng minh khả năng quan sát telemetry, không nên diễn giải trực tiếp thành số lần tấn công độc lập.
+
+Ví dụ, T1059.001-13 không phải một lệnh PowerShell đơn giản. Theo định nghĩa Atomic gốc, test này gọi module AtomicTestHarnesses:
+
+```text
+Out-ATHPowerShellCommandLineParameter
+  -CommandLineSwitchType Hyphen
+  -CommandParamVariation C
+  -UseEncodedArguments
+  -EncodedArgumentsParamVariation EA
+  -Execute
+  -ErrorAction Stop
+```
+
+Mục tiêu của test là sinh và thực thi các biến thể tham số dòng lệnh PowerShell, ví dụ các dạng rút gọn/biến thể của `-Command`, cách truyền command argument và encoded argument. Do đó một test có thể tạo nhiều process/script block telemetry, dẫn tới 37 event được ghi nhận bởi cả process_sensor và eventlog_4104_sensor.
+
+Ngược lại, T1059.001-17 là một kịch bản command execution đơn lẻ. Atomic YAML mô tả test này là chạy:
+
+```text
+powershell.exe -e #{obfuscated_code}
+```
+
+Trong đó payload mặc định giải mã ra hành vi đơn giản kiểu `Invoke-Expression` kết hợp `Write-Host "Hello, from PowerShell!"`. Vì chỉ có một lần thực thi chính và hành vi ngắn, agent ghi nhận 2 event từ eventlog_4104_sensor. Sự chênh lệch 37 event so với 2 event vì vậy phản ánh khác biệt trong thiết kế test case và nguồn telemetry, không phải do agent xử lý sai hoặc bỏ sót cùng một loại hành vi.
+
+Nhóm T1027 cho thấy agent có khả năng phát hiện các kỹ thuật obfuscation cơ bản như Base64, chuỗi bị làm rối và mảng ký tự. Các test này đều có max verdict là ALERT, phù hợp với mức độ rủi ro cần cảnh báo.
+
+Nhóm T1105 liên quan đến hành vi download được đánh giá ở mức rủi ro cao hơn, có max verdict là TERMINATE. Một số lệnh download có thể lỗi do điều kiện mạng hoặc môi trường, nhưng agent vẫn ghi nhận được telemetry và phân loại hành vi dựa trên command hoặc script block.
+
+Test T1059.001-18 được chạy riêng bằng quyền Administrator do yêu cầu elevation. Agent ghi nhận 3 event từ eventlog_4104_sensor, ML được kích hoạt và max verdict là TERMINATE. Kết quả này phù hợp với baseline mong đợi vì test gọi các known malicious cmdlets trong PowerShell.
+
+Lưu ý diễn giải test T1082-37: đây là kịch bản discovery về locale/regional settings, bản thân hành vi đọc locale hệ thống không tương đương với mã độc. Trong report, T1082-37 có max verdict TERMINATE vì event được chạy trong ngữ cảnh Atomic Red Team, được ghi nhận bởi cả process_sensor và eventlog_4104_sensor, rule có event ở mức ALERT và ML trả về MALICIOUS. Theo logic kết hợp verdict hiện tại của PythonAgent, ML MALICIOUS với độ tin cậy cao khi đi kèm rule ALERT hoặc risk context có thể nâng final verdict lên TERMINATE. Vì vậy, kết quả này nên được hiểu là detection trong ngữ cảnh mô phỏng tấn công, không phải kết luận rằng mọi lệnh kiểm tra locale đều cần bị chặn.
+
+Về mặt đánh giá khoa học, T1082-37 là điểm cần được nêu rõ như một nguy cơ false positive hoặc chính sách terminate còn nhạy với nhóm discovery-only. Với hệ thống thực tế, các hành vi discovery đơn lẻ như kiểm tra locale nên được ưu tiên ở mức ALERT hoặc chỉ nâng lên TERMINATE khi đi kèm tín hiệu nguy hiểm hơn như EncodedCommand, downloader, credential dumping, AMSI bypass, persistence hoặc chuỗi hành vi nhiều bước. Do đó, T1082-37 được tính là telemetry/detection pass trong kịch bản Atomic Red Team, đồng thời được đưa vào danh sách cần tuning và đánh giá thêm bằng tập lệnh quản trị benign.
+
+9. Nhận xét về nguồn telemetry
+
+process_sensor:
+Hiệu quả với các test có command line rõ ràng như encoded command, command parameter và discovery.
+
+eventlog_4104_sensor:
+Là nguồn telemetry quan trọng nhất trong kịch bản này vì ghi nhận nội dung script block của PowerShell. Nhiều hành vi đáng nghi chỉ thể hiện rõ ở nội dung script block thay vì command line.
+
+file_sensor:
+Không phải nguồn telemetry chính trong kịch bản này vì các Atomic tests chủ yếu được thực thi trực tiếp qua PowerShell, không tập trung vào tạo hoặc chỉnh sửa file script.
+
+amsi_cpp_bridge:
+Không phải mục tiêu chính của kịch bản Atomic Red Team này. AMSI bridge được đánh giá riêng trong kịch bản end-to-end với C++ AMSI Provider.
+
+10. Kết luận
+
+Trong kịch bản kiểm thử với Atomic Red Team, PythonAgent đạt kết quả phù hợp với mục tiêu của khóa luận. Agent thu thập telemetry thành công với 12/12 Atomic tests, đạt tỷ lệ 100%. Hệ thống ghi nhận được các hành vi PowerShell đáng nghi như encoded command, obfuscation, download và discovery. Các verdict cao nhất được sinh ra gồm 6 test TERMINATE và 6 test ALERT, không có test nào dừng ở mức ALLOW.
+
+Kết quả này cho thấy module telemetry và detection của PythonAgent có khả năng quan sát và phân loại các hành vi PowerShell đáng nghi trong môi trường lab. Event Log 4104 đóng vai trò đặc biệt quan trọng trong việc ghi nhận nội dung script block, hỗ trợ phát hiện các hành vi mà command line đơn thuần có thể không thể hiện đầy đủ.
+
+11. Giới hạn của kịch bản
+
+Kịch bản này chỉ sử dụng 12 Atomic tests được chọn lọc theo phạm vi PowerShell của đề tài, không chạy toàn bộ MITRE ATT&CK. Một số Atomic tests có thể phụ thuộc vào điều kiện môi trường như network, quyền Administrator hoặc module bổ sung. Thực nghiệm này chưa đánh giá false positive trên tập benign lớn, chưa đo overhead hệ thống, chưa đánh giá self-protection và chưa tập trung vào response.
+
+Do đó, kết quả nên được hiểu là bằng chứng cho khả năng telemetry và detection trong môi trường lab, không thay thế cho đánh giá EDR production-grade.
+
+12. Đoạn mô tả ngắn có thể đưa vào báo cáo khóa luận
+
+Kịch bản thực nghiệm đầu tiên sử dụng Atomic Red Team để đánh giá khả năng thu thập telemetry và phân loại hành vi PowerShell đáng nghi của PythonAgent. Nhóm nghiên cứu lựa chọn 12 Atomic tests thuộc các kỹ thuật T1059.001, T1027, T1105, T1082, T1057 và T1083. Kết quả cho thấy agent ghi nhận được telemetry trong 12/12 trường hợp, đạt tỷ lệ 100%. Các verdict cao nhất được sinh ra gồm 6 test TERMINATE và 6 test ALERT, không có test nào dừng ở mức ALLOW. Điều này cho thấy module telemetry và detection của agent có khả năng quan sát và phân loại các hành vi PowerShell như encoded command, obfuscation, download và discovery trong môi trường lab.

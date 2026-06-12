@@ -1,0 +1,228 @@
+BÁO CÁO TIẾN ĐỘ THỰC HIỆN KHÓA LUẬN TỐT NGHIỆP
+
+Sinh viên thực hiện: Đặng Tiến Đạt (22162010) & Vũ Đình Khang (22162015)
+Ngành / Chuyên ngành: An toàn thông tin
+Tên đề tài: Xây dựng hệ thống phát hiện và tự động ngăn chặn mã độc PowerShell dựa trên phân tích hành vi trong môi trường Windows
+Giảng viên hướng dẫn: ThS. Nguyễn Đăng Quang
+Thời điểm báo cáo: Tháng 05/2026
+
+1. Mục tiêu của đề tài
+
+Đề tài hướng đến xây dựng một hệ thống Mini EDR chạy trong môi trường Windows, tập trung vào phát hiện hành vi PowerShell đáng nghi và hỗ trợ phản ứng tự động ở mức prototype.
+
+Các mục tiêu chính:
+- Thu thập telemetry từ file, process command line, PowerShell Event Log 4104 và AMSI.
+- Trích xuất đặc trưng hành vi PowerShell theo bộ đặc trưng G2.96.
+- Phân loại hành vi bằng rule-based detection và mô hình Machine Learning.
+- Bổ sung cơ chế response có kiểm soát như terminate logic, quarantine file và ghi log bằng chứng.
+- Thực nghiệm hệ thống bằng test tự động, Atomic Red Team và một số kịch bản mã độc thực tế trong môi trường lab.
+
+2. Kiến trúc và pipeline hiện tại của hệ thống
+
+Pipeline hiện tại:
+
+Telemetry Sources
+    |
+    |-- File Sensor
+    |-- Process Sensor
+    |-- Event Log 4104 Sensor
+    |-- C++ AMSI Bridge
+    v
+PythonAgent
+    |
+    |-- Normalize Telemetry
+    |-- Feature Extraction G2.96
+    |-- Rule-based Detection
+    |-- Machine Learning Inference
+    |-- Verdict Combination
+    v
+Response Engine
+    |
+    |-- Protected List Check
+    |-- Process Termination Logic
+    |-- File Quarantine
+    |-- Evidence Logging
+    v
+Logs / Reports
+    |
+    |-- edr_events.jsonl
+    |-- edr_features_g296.csv
+    |-- test reports JSON
+
+Sơ đồ tổng quát:
+
++-------------------+       +-------------------+       +-------------------+
+| Telemetry Sources | ----> |    PythonAgent    | ----> | Response / Logs   |
++-------------------+       +-------------------+       +-------------------+
+| File Sensor       |       | Normalize Event   |       | Quarantine        |
+| Process Sensor    |       | Extract Features  |       | Terminate Logic   |
+| Event Log 4104    |       | Rule Detection    |       | Evidence JSONL    |
+| AMSI Bridge C++   |       | ML Classification |       | CSV Feature Logs  |
++-------------------+       +-------------------+       +-------------------+
+
+2.1. Làm rõ các nội dung theo góp ý của giáo viên hướng dẫn
+
+Ở lần báo cáo này, nhóm bổ sung phần làm rõ các điểm kỹ thuật đã được góp ý trong đề cương chi tiết.
+
+a. Kiến trúc kỹ thuật hiện tại
+
+Hệ thống hiện được triển khai theo mô hình user-mode prototype trên Windows, chưa chạy dưới dạng Windows Service. Thành phần phân tích chính là PythonAgent, được viết bằng Python. PythonAgent chạy như một process nền và có thể được khởi động/dừng bằng các script trong thư mục scripts.
+
+Các thành phần chính:
+- PythonAgent: viết bằng Python, dùng Flask để mở API nội bộ tại http://127.0.0.1:9001.
+- File Sensor: dùng watchdog để giám sát file script trong vùng theo dõi.
+- Process Sensor: dùng psutil để theo dõi tiến trình mới và command line.
+- Event Log 4104 Sensor: dùng pywin32/win32evtlog để đọc PowerShell Script Block Logging.
+- C++ AMSI Layer: gồm AmsiProvider.dll và AgentConsole.exe.
+- Machine Learning: dùng model Random Forest dạng .pkl và file feature_columns.pkl.
+
+Cơ chế giao tiếp giữa các module:
+- AmsiProvider.dll gửi telemetry sang C++ Agent qua Named Pipe.
+- C++ Agent forward telemetry sang PythonAgent qua HTTP POST /telemetry.
+- Các sensor nội bộ của PythonAgent đưa event vào hàng đợi chung.
+- PythonAgent ghi bằng chứng ra edr_events.jsonl và edr_features_g296.csv.
+
+b. Đánh giá overhead và tác động hệ thống
+
+Ở thời điểm hiện tại, nhóm đã ưu tiên hoàn thiện chức năng thu thập telemetry, detection, ML inference, AMSI bridge và response prototype. Việc benchmark overhead chính thức chưa hoàn tất, nhưng đã xác định các chỉ số cần đo trong giai đoạn tiếp theo:
+- CPU usage khi agent idle.
+- CPU usage khi chạy test hoặc khi có nhiều event.
+- RAM footprint của PythonAgent và C++ Agent.
+- Tác động đến IO khi File Sensor theo dõi thư mục người dùng.
+- So sánh trạng thái có agent và không có agent.
+
+Công cụ dự kiến sử dụng:
+- Task Manager / Resource Monitor.
+- PowerShell Get-Process.
+- psutil hoặc script đo CPU/RAM theo thời gian.
+- Windows Performance Monitor nếu cần biểu đồ chi tiết.
+
+c. Kịch bản test và metric đánh giá
+
+So với đề cương ban đầu, phần thực nghiệm hiện đã được cụ thể hóa rõ hơn. Các nhóm test đã hoặc đang được chuẩn bị gồm:
+- Test tự động cho File Sensor: 20 test.
+- Test tự động cho Process Sensor: 20 test.
+- Test tự động cho Event Log 4104 Sensor: 20 test.
+- Test ML model để kiểm tra khả năng phân loại.
+- Test Response Engine để kiểm tra quarantine, protected list và action log.
+- Test AMSI Bridge end-to-end.
+- Test Atomic Red Team với 12 kịch bản PowerShell chọn lọc.
+- Kịch bản mã độc thực tế trong lab gồm AgentTesla JS Dropper, PureCrypter JS Loader và PureCrypter EXE Loader.
+
+Metric đang sử dụng:
+- Tỷ lệ thu thập telemetry thành công.
+- Số lượng event quan sát được.
+- Sensor ghi nhận event.
+- rule_verdict, ml_verdict và final_verdict.
+- ML confidence.
+- response_action và response_success với các test response.
+
+Metric cần bổ sung trong giai đoạn tiếp theo:
+- Detection latency.
+- Response time.
+- CPU/RAM overhead.
+- False positive trên tập benign lớn hơn.
+
+d. Cơ chế cập nhật model
+
+Hiện tại hệ thống đã hỗ trợ ML inference, tức là agent có thể load model Random Forest đã train sẵn từ:
+- PythonAgent/model/random_forest_model.pkl
+- PythonAgent/model/feature_columns.pkl
+
+PythonAgent cũng đã có endpoint:
+- POST /reload-model
+
+Endpoint này cho phép nạp lại model mới sau khi thay file model trong thư mục PythonAgent/model. Tuy nhiên, hệ thống hiện chưa có online learning hoặc feedback loop tự động.
+
+Phạm vi hiện tại:
+- Có thể thay model thủ công.
+- Có thể reload model không cần sửa code.
+- Có log feature phục vụ huấn luyện lại.
+
+Hướng bổ sung nếu còn thời gian:
+- Tạo file feedback_labels.csv để ghi nhãn TP/FP/FN.
+- Tạo script retrain model định kỳ.
+- Tạo model_metadata.json để quản lý version model.
+- So sánh model cũ và model mới trước khi thay thế.
+
+3. Nội dung công việc đã thực hiện
+
+1. Xây dựng PythonAgent thu thập telemetry đa nguồn: đã hoàn thành.
+2. Hoàn thiện File Sensor theo dõi file script trong vùng giám sát: đã hoàn thành.
+3. Hoàn thiện Process Sensor thu thập process command line: đã hoàn thành.
+4. Hoàn thiện Event Log 4104 Sensor: đã hoàn thành.
+5. Tích hợp bộ trích đặc trưng G2.96: đã hoàn thành.
+6. Tích hợp rule-based detection: đã hoàn thành.
+7. Tích hợp mô hình Machine Learning dạng .pkl: đã hoàn thành ở mức inference.
+8. Bổ sung C++ AMSI Bridge và kiểm thử end-to-end: đã hoàn thành.
+9. Bổ sung response opt-in: protected list, quarantine, evidence log: đã hoàn thành ở mức lab.
+10. Viết tài liệu kiến trúc, giới hạn hệ thống và hướng dẫn test: đang hoàn thiện.
+
+4. Kết quả thực nghiệm hiện tại
+
+File Sensor: 20/20 test đạt.
+Process Sensor: 20/20 test đạt.
+Event Log 4104 Sensor: 20/20 test đạt.
+ML Model Test: Pass.
+Atomic Red Team: 12/12 test có telemetry.
+Response Test: 15/15 test đạt.
+AMSI Bridge E2E: Pass.
+Registered AMSI Provider E2E: Pass.
+
+Kết quả cho thấy hệ thống đã đạt được mục tiêu chính của giai đoạn prototype: thu thập telemetry từ nhiều nguồn, phân tích hành vi PowerShell và sinh verdict phù hợp trong môi trường lab.
+
+5. Kịch bản thực nghiệm đã thực hiện
+
+5.1. Atomic Red Team
+
+Đã sử dụng Atomic Red Team để kiểm thử các nhóm hành vi PowerShell như command execution, encoded command, obfuscation, downloader behavior, discovery và known malicious PowerShell cmdlets.
+
+Kết quả: 12/12 test có telemetry, agent sinh verdict ALERT hoặc TERMINATE.
+
+5.2. Kịch bản mã độc thực tế trong lab
+
+Đã xây dựng nội dung kiểm thử với một số chuỗi hành vi thực tế:
+- AgentTesla JS Dropper: fileless PowerShell, WMI spawn, payload staging.
+- PureCrypter JS Loader: JavaScript obfuscation, self-copy, PowerShell chaining, anti-sandbox.
+- PureCrypter EXE Loader: Defender tampering, process masquerading, scheduled task behavior.
+
+Các kịch bản này được dùng để đánh giá khả năng phối hợp giữa File Sensor, Process Sensor, Event Log 4104 Sensor, C++ AMSI Bridge và PythonAgent.
+
+6. Kết quả đạt được đến thời điểm báo cáo
+
+Hệ thống hiện đã có đầy đủ các thành phần chính của một Mini EDR prototype:
+- Agent user-mode chạy trên Windows.
+- Thu thập telemetry từ file, process, Event Log 4104 và AMSI.
+- Trích xuất đặc trưng hành vi PowerShell.
+- Phân loại bằng rule-based detection và Machine Learning.
+- Ghi log bằng chứng cho từng event.
+- Có response ở mức có kiểm soát, gồm protected list và quarantine.
+- Có bộ test tự động và report JSON cho từng nhóm chức năng.
+- Có tài liệu kiến trúc, hướng dẫn test Atomic Red Team và tổng hợp kết quả thực nghiệm.
+
+7. Khó khăn và giới hạn hiện tại
+
+- Response hiện tại mới phù hợp môi trường lab, chưa phải production-grade.
+- Event Log 4104 không có PID tin cậy nên không dùng trực tiếp để kill process.
+- File quarantine chỉ áp dụng tốt với file nằm trong watch path.
+- File Sensor có giới hạn kích thước file để tránh đọc file quá lớn.
+- Một số telemetry từ module hợp pháp của Microsoft có thể gây nhiễu nhẹ.
+- Chưa có vòng lặp phản hồi và cập nhật mô hình tự động.
+- Chưa đánh giá false positive trên tập dữ liệu benign lớn.
+
+8. Kế hoạch thực hiện trong giai đoạn tiếp theo
+
+Các công việc cần tiếp tục:
+1. Hoàn thiện báo cáo thực nghiệm cho Atomic Red Team.
+2. Hoàn thiện báo cáo thực nghiệm với kịch bản mã độc thực tế trong môi trường lab.
+3. Bổ sung sơ đồ kiến trúc, pipeline xử lý và hình ảnh demo vào báo cáo khóa luận.
+4. Chuẩn hóa phần giới hạn hệ thống và hướng phát triển.
+5. Chuẩn bị demo end-to-end: PythonAgent, AMSI Bridge, Atomic Red Team và report log.
+6. Hoàn thiện slide bảo vệ và checklist chạy demo.
+7. Nếu còn thời gian, bổ sung kịch bản Invoke-Obfuscation để đánh giá khả năng chống lẩn tránh.
+
+9. Đánh giá chung
+
+So với mục tiêu đề tài, project hiện đã vượt qua giai đoạn xây dựng agent cơ bản và đang ở giai đoạn hoàn thiện thực nghiệm, tài liệu và demo. Các chức năng chính gồm telemetry, feature extraction, detection, ML inference, AMSI bridge và response prototype đều đã có kết quả kiểm thử.
+
+Trong giai đoạn tiếp theo, trọng tâm không còn là xây thêm nhiều chức năng mới, mà là chuẩn hóa báo cáo, minh chứng thực nghiệm, hình ảnh demo và phần đánh giá giới hạn của hệ thống.

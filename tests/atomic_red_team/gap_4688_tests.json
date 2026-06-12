@@ -1,0 +1,44 @@
+[
+  {
+    "id": "ART-ACC-021",
+    "set": "tuning",
+    "category": "registry_persistence",
+    "technique": "T1547.001",
+    "test_number": "1",
+    "name": "Reg Key Run",
+    "expected_telemetry": true,
+    "expected_sources_any": ["process_sensor", "eventlog_4688_sensor"],
+    "expected_min_verdict": "ALERT",
+    "expected_max_verdict": "ALERT",
+    "run_as_admin": false,
+    "rationale": "HKCU Run key persistence should be detected through process polling or Security 4688 process creation telemetry."
+  },
+  {
+    "id": "ART-ACC-027",
+    "set": "tuning",
+    "category": "scheduled_task",
+    "technique": "T1053.005",
+    "test_number": "2",
+    "name": "Scheduled task Local",
+    "expected_telemetry": true,
+    "expected_sources_any": ["process_sensor", "eventlog_4688_sensor"],
+    "expected_min_verdict": "ALERT",
+    "expected_max_verdict": "ALERT",
+    "run_as_admin": false,
+    "rationale": "Local schtasks creation is persistence-like and should be visible through process polling or Security 4688 process creation telemetry."
+  },
+  {
+    "id": "ART-ACC-029",
+    "set": "holdout",
+    "category": "scheduled_task",
+    "technique": "T1053.005",
+    "test_number": "7",
+    "name": "Scheduled Task Executing Base64 Encoded Commands From Registry",
+    "expected_telemetry": true,
+    "expected_sources_any": ["process_sensor", "eventlog_4104_sensor", "eventlog_4688_sensor"],
+    "expected_min_verdict": "TERMINATE",
+    "expected_max_verdict": "TERMINATE",
+    "run_as_admin": false,
+    "rationale": "Scheduled task plus encoded command plus registry staging is a strong persistence/execution chain. It should be visible through process, script block, or Security 4688 telemetry."
+  }
+]

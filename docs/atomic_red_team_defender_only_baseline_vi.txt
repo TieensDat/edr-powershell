@@ -1,0 +1,259 @@
+HUONG DAN CHAY 12 ATOMIC RED TEAM VOI WINDOWS DEFENDER ONLY
+
+Tai lieu nay dung de chay lai 12 test Atomic Red Team trong dieu kien chi bat Windows Defender, khong chay PythonAgent va khong chay C++ AMSI Bridge Agent. Muc tieu la tao baseline so sanh: Windows Defender xu ly duoc nhung test nao khi khong co he thong EDR cua de tai.
+
+Checkpoint khuyen nghi: CP01_Runtime_Install_Agent_stopped.
+
+
+1. KHOI PHUC CHECKPOINT
+
+Tren Hyper-V Manager, chon may ao Windows 10 test, vao muc Checkpoints, chon CP01_Runtime_Install_Agent_stopped, sau do chon Apply.
+
+Neu dung PowerShell tren may host:
+
+Restore-VMCheckpoint -VMName "<TEN_MAY_AO>" -Name "CP01_Runtime_Install_Agent_stopped" -Confirm:$false
+
+Sau khi may ao khoi dong lai, dang nhap vao Windows va mo PowerShell bang quyen Administrator.
+
+
+2. DAM BAO AGENT CUA DE TAI KHONG CHAY
+
+Neu thu muc runtime nam tai C:\KLTN\mini-edr-powershell-runtime, chay:
+
+cd C:\KLTN\mini-edr-powershell-runtime
+Get-Process python,AgentConsole -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process python,AgentConsole -ErrorAction SilentlyContinue
+
+Lenh cuoi cung khong nen tra ve tien trinh nao. Neu van thay python.exe hoac AgentConsole.exe, can dung lai truoc khi chay Atomic test.
+
+Khong chay cac thanh phan sau trong kich ban nay:
+- start_python_agent.ps1
+- AgentConsole.exe
+- script test Atomic cua project vi runner cua project phu thuoc PythonAgent /health
+
+
+3. KIEM TRA WINDOWS DEFENDER
+
+Chay cac lenh sau de kiem tra trang thai Defender:
+
+Get-MpComputerStatus | Select-Object AMServiceEnabled,AntivirusEnabled,RealTimeProtectionEnabled,BehaviorMonitorEnabled,IoavProtectionEnabled
+Set-MpPreference -DisableRealtimeMonitoring $false
+
+Neu Windows chan thay doi do Tamper Protection, mo Windows Security -> Virus & threat protection -> Manage settings, sau do kiem tra Real-time protection dang bat.
+
+Luu y: khong them Defender exclusion cho thu muc Atomic Red Team trong phep do nay, vi muc tieu la quan sat hanh vi mac dinh cua Defender.
+
+
+4. CAI ATOMIC RED TEAM NEU MAY CHUA CO
+
+Neu may test chua co C:\AtomicRedTeam, chay:
+
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Install-Module -Name powershell-yaml -Scope CurrentUser -Force
+IEX (IWR 'https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/install-atomicredteam.ps1' -UseBasicParsing)
+Install-AtomicRedTeam -getAtomics -Force
+
+Kiem tra cai dat:
+
+Test-Path C:\AtomicRedTeam\atomics
+Test-Path C:\AtomicRedTeam\invoke-atomicredteam\Invoke-AtomicRedTeam.psd1
+
+Ca hai lenh nen tra ve True.
+
+
+5. CHAY 12 TEST ATOMIC RED TEAM VOI DEFENDER ONLY
+
+Chay toan bo block duoi day trong PowerShell Administrator:
+
+Set-ExecutionPolicy Bypass -Scope Process -Force
+Import-Module powershell-yaml -Force
+Import-Module C:\AtomicRedTeam\invoke-atomicredteam\Invoke-AtomicRedTeam.psd1 -Force
+
+$AtomicsPath = "C:\AtomicRedTeam\atomics"
+$RunId = "DEFENDER_ONLY_" + (Get-Date -Format "yyyyMMdd_HHmmss")
+$StartTime = Get-Date
+$OutDir = Join-Path (Get-Location) "defender_only_results_$RunId"
+New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
+
+$Tests = @(
+    [pscustomobject]@{ Technique="T1059.001"; TestNumber="13"; Name="PowerShell command-line parameter variations" },
+    [pscustomobject]@{ Technique="T1059.001"; TestNumber="15"; Name="PowerShell suspicious execution pattern" },
+    [pscustomobject]@{ Technique="T1059.001"; TestNumber="17"; Name="PowerShell encoded command" },
+    [pscustomobject]@{ Technique="T1059.001"; TestNumber="18"; Name="PowerShell session policy manipulation" },
+    [pscustomobject]@{ Technique="T1027"; TestNumber="2"; Name="Obfuscated command / encoded payload" },
+    [pscustomobject]@{ Technique="T1027"; TestNumber="7"; Name="Obfuscated script content" },
+    [pscustomobject]@{ Technique="T1027"; TestNumber="11"; Name="Obfuscated PowerShell behavior" },
+    [pscustomobject]@{ Technique="T1105"; TestNumber="10"; Name="PowerShell download behavior" },
+    [pscustomobject]@{ Technique="T1105"; TestNumber="15"; Name="Ingress tool transfer over PowerShell" },
+    [pscustomobject]@{ Technique="T1082"; TestNumber="37"; Name="System locale discovery" },
+    [pscustomobject]@{ Technique="T1057"; TestNumber="3"; Name="Process discovery" },
+    [pscustomobject]@{ Technique="T1083"; TestNumber="2"; Name="File and directory discovery" }
+)
+
+$Results = foreach ($t in $Tests) {
+    Write-Host "[ATOMIC] Running $($t.Technique)-$($t.TestNumber): $($t.Name)"
+
+    $status = "UNKNOWN"
+    $errorText = ""
+    $prereqTail = ""
+    $executionTail = ""
+
+    try {
+        $pre = Invoke-AtomicTest $t.Technique `
+            -TestNumbers $t.TestNumber `
+            -PathToAtomicsFolder $AtomicsPath `
+            -CheckPrereqs *>&1 | Out-String
+
+        $prereqTail = (($pre -split "`r?`n") | Select-Object -Last 8) -join "`n"
+
+        if ($pre -match "Prerequisites met") {
+            $status = "EXECUTED"
+            $out = Invoke-AtomicTest $t.Technique `
+                -TestNumbers $t.TestNumber `
+                -PathToAtomicsFolder $AtomicsPath `
+                -TimeoutSeconds 60 `
+                -NoExecutionLog *>&1 | Out-String
+
+            $executionTail = (($out -split "`r?`n") | Select-Object -Last 12) -join "`n"
+        }
+        else {
+            $status = "SKIPPED_PREREQ"
+        }
+    }
+    catch {
+        $status = "ERROR"
+        $errorText = $_.Exception.Message
+    }
+
+    Start-Sleep -Seconds 5
+
+    [pscustomobject]@{
+        RunId = $RunId
+        Technique = $t.Technique
+        TestNumber = $t.TestNumber
+        AtomicId = "$($t.Technique)-$($t.TestNumber)"
+        Name = $t.Name
+        Status = $status
+        Error = $errorText
+        PrereqTail = $prereqTail
+        ExecutionTail = $executionTail
+    }
+}
+
+$Results | Export-Csv (Join-Path $OutDir "atomic_execution.csv") -NoTypeInformation -Encoding UTF8
+
+Get-MpThreatDetection |
+    Where-Object { $_.InitialDetectionTime -ge $StartTime } |
+    Export-Csv (Join-Path $OutDir "defender_threat_detection.csv") -NoTypeInformation -Encoding UTF8
+
+Get-WinEvent -FilterHashtable @{
+    LogName = "Microsoft-Windows-Windows Defender/Operational"
+    StartTime = $StartTime
+} -ErrorAction SilentlyContinue |
+    Select-Object TimeCreated, Id, ProviderName, Message |
+    Export-Csv (Join-Path $OutDir "defender_operational_events.csv") -NoTypeInformation -Encoding UTF8
+
+$Results | Format-Table AtomicId,Status,Name -AutoSize
+Write-Host ""
+Write-Host "Output folder: $OutDir"
+
+
+6. BANG CHUNG CAN CHUP VA LUU
+
+Sau khi chay xong, can luu cac bang chung sau:
+
+- Anh man hinh PowerShell hien thi bang AtomicId, Status, Name.
+- Anh thu muc ket qua defender_only_results_<RunId>.
+- File atomic_execution.csv.
+- File defender_threat_detection.csv.
+- File defender_operational_events.csv.
+- Anh Windows Security -> Virus & threat protection -> Protection history, neu Defender co canh bao hoac quarantine.
+
+
+7. CACH DOC KET QUA
+
+atomic_execution.csv cho biet 12 Atomic test da chay duoc hay bi bo qua do thieu prerequisite.
+
+defender_threat_detection.csv va defender_operational_events.csv cho biet Windows Defender co ghi nhan, canh bao, chan hoac quarantine hanh vi nao hay khong.
+
+Ket qua nay khong dung de chung minh PythonAgent tot hon Defender. No dung de tra loi cau hoi baseline: neu chi bat Windows Defender thi 12 kich ban Atomic Red Team duoc xu ly nhu the nao.
+
+Sau do so sanh voi ket qua khi bat PythonAgent va C++ AMSI Bridge de lam ro dong gop cua he thong de tai:
+- Thu thap telemetry tu nhieu nguon.
+- Giai thich ly do verdict.
+- Ghi log bang chung.
+- Ho tro response/quarantine trong pham vi lab.
+- Cho phep tuy chinh rule/model phu hop voi muc tieu khoa luan.
+
+
+8. CHAY DU 12 TEST VA LAP LAI DE KIEM TRA TINH ON DINH
+
+Neu lan chay dau co test SKIPPED_PREREQ, khong nen dung ket qua do de ket luan Defender detect hay khong detect. Truoc khi chay lai, can cai du prerequisite cho cac test bi thieu. Voi hai test T1059.001-13 va T1059.001-15, prerequisite thuong gap la module AtomicTestHarnesses.
+
+Chay trong PowerShell Administrator:
+
+Set-ExecutionPolicy Bypass -Scope Process -Force
+Import-Module powershell-yaml -Force
+Import-Module C:\AtomicRedTeam\invoke-atomicredteam\Invoke-AtomicRedTeam.psd1 -Force
+
+Invoke-AtomicTest T1059.001 `
+    -TestNumbers 13,15 `
+    -PathToAtomicsFolder C:\AtomicRedTeam\atomics `
+    -GetPrereqs
+
+Invoke-AtomicTest T1059.001 `
+    -TestNumbers 13,15 `
+    -PathToAtomicsFolder C:\AtomicRedTeam\atomics `
+    -CheckPrereqs
+
+Khi ca 12 test deu khong con SKIPPED_PREREQ, nen tao mot checkpoint moi, vi du:
+
+CP02_DefenderOnly_AtomicReady
+
+Checkpoint nay nen duoc tao sau khi:
+
+- Atomic Red Team da cai xong.
+- Prerequisite cua 12 test da du.
+- PythonAgent va AgentConsole khong chay.
+- Windows Defender dang bat.
+
+Quy trinh chay lap lai khuyen nghi:
+
+1. Apply checkpoint CP02_DefenderOnly_AtomicReady.
+2. Doi Windows on dinh khoang 2-3 phut sau khi dang nhap.
+3. Kiem tra lai agent khong chay:
+
+Get-Process python,AgentConsole -ErrorAction SilentlyContinue
+
+4. Kiem tra Defender dang bat:
+
+Get-MpComputerStatus | Select-Object AMServiceEnabled,AntivirusEnabled,RealTimeProtectionEnabled,BehaviorMonitorEnabled,IoavProtectionEnabled
+
+5. Chay block test o muc 5 va luu thu muc ket qua voi ten run ro rang, vi du:
+
+defender_only_results_run1
+defender_only_results_run2
+defender_only_results_run3
+
+6. Sau moi lan chay, copy thu muc ket qua ra ngoai hoac luu vao thu muc bao cao.
+7. Truoc lan chay tiep theo, apply lai checkpoint CP02_DefenderOnly_AtomicReady.
+
+Khong nen chay lien tiep nhieu lan tren cung mot trang thai may neu muc tieu la so sanh khoa hoc. Sau khi Defender da detect/quarantine/remediate mot hanh vi, trang thai he thong, cache cloud protection va threat history co the thay doi, lam ket qua lan sau khong con tuong duong lan dau.
+
+Nen chay it nhat 3 lan. Neu thoi gian cho phep, chay 5 lan se tot hon. Bang tong hop nen co cac cot:
+
+Atomic ID | Run 1 | Run 2 | Run 3 | Defender event 1116/1117 | Ket luan
+T1059.001-18 | ERROR/blocked | ERROR/blocked | ERROR/blocked | Co | Defender chan on dinh
+T1105-10 | ERROR/blocked | ERROR/blocked | ERROR/blocked | Co | Defender chan on dinh
+T1082-37 | EXECUTED | EXECUTED | EXECUTED | Khong | Defender khong canh bao
+
+Tieu chi ket luan mot test bi Windows Defender chan:
+
+- atomic_execution.csv co Status = ERROR hoac output the hien command khong chay duoc.
+- Error co noi dung nhu Access is denied.
+- Trong cung khoang thoi gian chay test, defender_operational_events.csv co event ID 1116 hoac 1117.
+- Message cua Defender co threat name, severity, action va command/path lien quan den test dang chay.
+- defender_threat_detection.csv co ban ghi threat detection tuong ung.
+
+Neu test bi ERROR nhung khong co event Defender tuong ung, khong nen ket luan la Defender chan. Khi do can xem lai loi moi truong nhu thieu quyen Administrator, loi mang, thieu file, thieu module, hoac command cua Atomic test khong tuong thich voi may test.

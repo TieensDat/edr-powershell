@@ -48,6 +48,12 @@ Bang tong hop ket qua thuc nghiem nam tai:
 docs/experiment_results_summary.md
 ```
 
+Bao cao rieng cho kich ban test Atomic Red Team nam tai:
+
+```text
+docs/atomic_red_team_experiment_report.md
+```
+
 Huong dan chay lai bo test Atomic Red Team tren may moi nam tai:
 
 ```text
